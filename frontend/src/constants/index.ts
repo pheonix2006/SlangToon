@@ -11,5 +11,3 @@ export const TIMEOUTS = {
   COMIC_REQUEST: 400_000,
   HISTORY_REQUEST: 10_000,
 } as const;
-
-export const COUNTDOWN_SECONDS = 3;

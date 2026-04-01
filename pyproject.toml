@@ -1,7 +1,7 @@
 [project]
-name = "pose-art-generator"
+name = "slangtoon"
 version = "1.0.0"
-description = "Pose Art Generator - camera + AI art generation"
+description = "SlangToon - AI slang-to-comic generator"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.110.0",

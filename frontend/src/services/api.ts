@@ -14,21 +14,21 @@ class ApiError extends Error {
 
 function parseApiError(error: unknown): string {
   if (error instanceof ApiError) {
-    return `请求失败 (${error.status}): ${error.statusText}`;
+    return `Request failed (${error.status}): ${error.statusText}`;
   }
   if (error instanceof DOMException && error.name === 'TimeoutError') {
-    return '请求超时，请稍后重试';
+    return 'Request timed out, please try again';
   }
   if (error instanceof DOMException && error.name === 'AbortError') {
-    return '请求被取消';
+    return 'Request cancelled';
   }
   if (error instanceof TypeError) {
-    return '网络错误，请检查网络连接';
+    return 'Network error, please check your connection';
   }
   if (error instanceof Error) {
     return error.message;
   }
-  return '未知错误';
+  return 'Unknown error';
 }
 
 async function request<T>(

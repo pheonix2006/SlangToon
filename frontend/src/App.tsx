@@ -41,6 +41,22 @@ function App() {
   // ── Camera hook ──
   const { videoRef, isReady, error: cameraError, restart: restartCamera } = useCamera();
 
+  // ── Script generation ──
+  const handleGenerateScript = useCallback(async () => {
+    setError(null);
+    setAppState(AppState.SCRIPT_LOADING);
+
+    try {
+      const response = await generateScript();
+      setScriptData(response.data);
+      setAppState(AppState.SCRIPT_PREVIEW);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate script';
+      setError(msg);
+      setAppState(AppState.CAMERA_READY);
+    }
+  }, []);
+
   // ── Gesture handling ──
   const onGestureDetected = useCallback(
     (event: { gesture: 'ok' | 'open_palm' | 'none'; confidence: number }) => {
@@ -55,7 +71,7 @@ function App() {
         goHome();
       }
     },
-    [goHome],
+    [goHome, handleGenerateScript],
   );
 
   const { processLandmarks } = useGestureDetector({ onGestureDetected });
@@ -73,22 +89,6 @@ function App() {
     videoRef,
     onResults: handleMediaPipeResults,
   });
-
-  // ── Script generation ──
-  const handleGenerateScript = useCallback(async () => {
-    setError(null);
-    setAppState(AppState.SCRIPT_LOADING);
-
-    try {
-      const response = await generateScript();
-      setScriptData(response.data);
-      setAppState(AppState.SCRIPT_PREVIEW);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to generate script';
-      setError(msg);
-      setAppState(AppState.CAMERA_READY);
-    }
-  }, []);
 
   // ── Comic generation ──
   const handleGenerateComic = useCallback(async () => {

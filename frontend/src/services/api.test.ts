@@ -78,20 +78,20 @@ describe('generateScript', () => {
   it('throws on network error (TypeError) with correct message', async () => {
     mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
-    await expect(generateScript()).rejects.toThrow('网络错误，请检查网络连接');
+    await expect(generateScript()).rejects.toThrow('Network error, please check your connection');
   });
 
   it('throws on business error (code !== 0) with server message', async () => {
-    const bizError = { code: 500, message: '获取俚语失败' };
+    const bizError = { code: 500, message: 'Failed to generate slang' };
     mockFetch.mockResolvedValue(mockJsonResponse(bizError));
 
-    await expect(generateScript()).rejects.toThrow('获取俚语失败');
+    await expect(generateScript()).rejects.toThrow('Failed to generate slang');
   });
 
   it('throws on HTTP error (status 500)', async () => {
     mockFetch.mockResolvedValue(mockErrorResponse(500, 'Internal Server Error'));
 
-    await expect(generateScript()).rejects.toThrow('请求失败 (500)');
+    await expect(generateScript()).rejects.toThrow('Request failed (500)');
   });
 });
 
@@ -133,7 +133,7 @@ describe('generateComic', () => {
     mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
     await expect(generateComic(scriptData)).rejects.toThrow(
-      '网络错误，请检查网络连接',
+      'Network error, please check your connection',
     );
   });
 });
@@ -164,6 +164,6 @@ describe('getHistory', () => {
   it('throws on network error', async () => {
     mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
-    await expect(getHistory(1, 10)).rejects.toThrow('网络错误，请检查网络连接');
+    await expect(getHistory(1, 10)).rejects.toThrow('Network error, please check your connection');
   });
 });

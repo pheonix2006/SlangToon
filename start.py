@@ -1,5 +1,5 @@
 """
-Pose Art Generator - unified startup script.
+SlangToon - unified startup script.
 Launches backend (FastAPI) and frontend (Vite) dev servers.
 
 Usage:
@@ -75,13 +75,14 @@ def preflight_check() -> bool:
 
 def print_banner():
     banner = r"""
-  ____  _       _     ____        __
- |  _ \| | ___ | |__ |  _ \  ___ / _|
- | |_) | |/ _ \| '_ \| | | |/ _ \ |_
- |  __/| | (_) | |_) | |_| |  __/  _|
- |_|   |_|\___/|_.__/|____/ \___|_|
+  _____ _       _   _       __  __
+ |_   _| |     | \ | | ___ |  \/  |
+   | | | | __ _|  \| |/ _ \| |\/| |
+   | | | |/ _` | |\  |  __/| |  | |
+   |_| |_|\__, |_| \_|\___||_|  |_|
+          |___/
 
-  Pose Art Generator - one-click start
+   SlangToon - AI Slang-to-Comic Generator
 """
     print(banner)
 

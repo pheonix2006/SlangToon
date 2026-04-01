@@ -22,7 +22,7 @@ class TestFlowTraceModel:
         trace = FlowTrace(
             trace_id="test-001",
             request_id="req-abc12345",
-            flow_type="analyze",
+            flow_type="script",
             status="success",
             created_at="2026-03-31T10:00:00.000",
             total_duration_ms=1000.0,
@@ -30,18 +30,18 @@ class TestFlowTraceModel:
         )
         assert trace.trace_id == "test-001"
         assert trace.request_id == "req-abc12345"
-        assert trace.flow_type == "analyze"
+        assert trace.flow_type == "script"
         assert trace.status == "success"
         assert trace.error is None
 
     def test_flow_trace_with_error(self):
         trace = FlowTrace(
-            trace_id="test-002", request_id="req-xxx", flow_type="generate",
+            trace_id="test-002", request_id="req-xxx", flow_type="comic",
             status="failed", created_at="2026-03-31T10:00:00.000",
-            total_duration_ms=5000.0, steps=[], error="LLM timeout",
+            total_duration_ms=5000.0, steps=[], error="Image generation timeout",
         )
         assert trace.status == "failed"
-        assert trace.error == "LLM timeout"
+        assert trace.error == "Image generation timeout"
 
     def test_flow_trace_validation_invalid_flow_type(self):
         with pytest.raises(Exception):
@@ -53,15 +53,15 @@ class TestFlowTraceModel:
     def test_flow_trace_validation_invalid_status(self):
         with pytest.raises(Exception):
             FlowTrace(
-                trace_id="x", request_id="x", flow_type="analyze",
+                trace_id="x", request_id="x", flow_type="script",
                 status="invalid", created_at="x", total_duration_ms=0, steps=[],
             )
 
 
 class TestFlowStepModel:
     def test_flow_step_model_valid(self):
-        step = FlowStep(name="llm_analyze", started_at="2026-03-31T10:00:00.000", status="success", duration_ms=100.0)
-        assert step.name == "llm_analyze"
+        step = FlowStep(name="script_generation", started_at="2026-03-31T10:00:00.000", status="success", duration_ms=100.0)
+        assert step.name == "script_generation"
         assert step.status == "success"
 
     def test_flow_step_default_values(self):
@@ -71,8 +71,8 @@ class TestFlowStepModel:
         assert step.error is None
 
     def test_flow_step_with_detail(self):
-        step = FlowStep(name="llm_analyze", started_at="x", status="success",
-                        detail={"model": "glm-4.6v", "image_size": 12345})
+        step = FlowStep(name="script_generation", started_at="x", status="success",
+                        detail={"model": "glm-4.6v", "panel_count": 4})
         assert step.detail["model"] == "glm-4.6v"
 
     def test_flow_step_serialization(self):
@@ -89,8 +89,8 @@ class TestFlowStepModel:
 class TestFlowSession:
     @pytest.mark.asyncio
     async def test_session_step_success_records_timing(self):
-        session = FlowSession("analyze")
-        async with session.step("llm_analyze", detail={"model": "glm-4.6v"}) as step:
+        session = FlowSession("script")
+        async with session.step("script_generation", detail={"model": "glm-4.6v"}) as step:
             await asyncio.sleep(0.01)
         assert session.trace.steps[0].status == "success"
         assert session.trace.steps[0].duration_ms > 0
@@ -98,16 +98,16 @@ class TestFlowSession:
 
     @pytest.mark.asyncio
     async def test_session_step_failed_records_error(self):
-        session = FlowSession("analyze")
+        session = FlowSession("script")
         with pytest.raises(ValueError, match="test error"):
-            async with session.step("llm_analyze") as step:
+            async with session.step("script_generation") as step:
                 raise ValueError("test error")
         assert session.trace.steps[0].status == "failed"
         assert "test error" in session.trace.steps[0].error
 
     @pytest.mark.asyncio
     async def test_session_step_failed_reraises_exception(self):
-        session = FlowSession("analyze")
+        session = FlowSession("script")
         with pytest.raises(RuntimeError):
             async with session.step("failing"):
                 raise RuntimeError("original error")
@@ -115,14 +115,14 @@ class TestFlowSession:
 
     @pytest.mark.asyncio
     async def test_session_step_with_detail(self):
-        session = FlowSession("generate")
-        async with session.step("compose_prompt", detail={"style_name": "赛博朋克"}):
+        session = FlowSession("comic")
+        async with session.step("build_prompt", detail={"slang": "cool beans"}) as _s:
             pass
-        assert session.trace.steps[0].detail["style_name"] == "赛博朋克"
+        assert session.trace.steps[0].detail["slang"] == "cool beans"
 
     @pytest.mark.asyncio
     async def test_session_finish_calculates_total_duration(self):
-        session = FlowSession("analyze")
+        session = FlowSession("script")
         await asyncio.sleep(0.01)
         session.finish("success")
         assert session.trace.total_duration_ms > 0
@@ -130,28 +130,28 @@ class TestFlowSession:
 
     @pytest.mark.asyncio
     async def test_session_finish_with_error(self):
-        session = FlowSession("generate")
+        session = FlowSession("comic")
         session.finish("failed", error="Image generation timeout")
         assert session.trace.status == "failed"
         assert session.trace.error == "Image generation timeout"
 
     @pytest.mark.asyncio
     async def test_session_multiple_steps_ordered(self):
-        session = FlowSession("generate")
-        async with session.step("save_photo"):
+        session = FlowSession("comic")
+        async with session.step("build_prompt"):
             pass
-        async with session.step("compose_prompt"):
+        async with session.step("image_generation"):
             pass
-        async with session.step("image_generate"):
+        async with session.step("save_comic"):
             pass
         assert len(session.trace.steps) == 3
-        assert session.trace.steps[0].name == "save_photo"
-        assert session.trace.steps[2].name == "image_generate"
+        assert session.trace.steps[0].name == "build_prompt"
+        assert session.trace.steps[2].name == "save_comic"
 
     @pytest.mark.asyncio
     async def test_session_concurrent_isolation(self):
-        session_a = FlowSession("analyze")
-        session_b = FlowSession("generate")
+        session_a = FlowSession("script")
+        session_b = FlowSession("comic")
 
         async def add_steps(session, count):
             for i in range(count):
@@ -164,7 +164,7 @@ class TestFlowSession:
 
     @pytest.mark.asyncio
     async def test_session_init_with_request_id(self):
-        session = FlowSession("analyze", request_id="req-abc12345")
+        session = FlowSession("script", request_id="req-abc12345")
         assert session.trace.request_id == "req-abc12345"
 
 
@@ -211,7 +211,7 @@ class TestContextvarsPropagation:
     @pytest.mark.asyncio
     async def test_set_and_get_current_trace(self):
         from app.flow_log import set_current_trace
-        session = FlowSession("analyze")
+        session = FlowSession("script")
         set_current_trace(session)
         retrieved = get_current_trace()
         assert isinstance(retrieved, FlowSession)
@@ -236,7 +236,7 @@ class TestTraceStore:
         from app.flow_log.trace_store import TraceStore
         return TraceStore(trace_dir, retention_days=7)
 
-    def _make_trace(self, flow_type="analyze", days_ago=0):
+    def _make_trace(self, flow_type="script", days_ago=0):
         """创建测试用 FlowTrace，支持指定多少天前。"""
         dt = datetime.now(timezone.utc) - timedelta(days=days_ago)
         return FlowTrace(
@@ -257,8 +257,8 @@ class TestTraceStore:
         assert files[0].name.endswith(".jsonl")
 
     def test_store_save_appends_lines(self, store, trace_dir):
-        store.save(self._make_trace(flow_type="analyze"))
-        store.save(self._make_trace(flow_type="generate"))
+        store.save(self._make_trace(flow_type="script"))
+        store.save(self._make_trace(flow_type="comic"))
         file = list(Path(trace_dir).glob("*.jsonl"))[0]
         lines = file.read_text(encoding="utf-8").strip().split("\n")
         assert len(lines) == 2
@@ -275,7 +275,7 @@ class TestTraceStore:
         store.save(self._make_trace())
         traces = store.query()
         assert len(traces) == 1
-        assert traces[0].flow_type == "analyze"
+        assert traces[0].flow_type == "script"
 
     def test_store_query_default_date(self, store, trace_dir):
         store.save(self._make_trace(days_ago=0))
@@ -283,8 +283,8 @@ class TestTraceStore:
         assert len(traces) == 1
 
     def test_store_query_limit(self, store, trace_dir):
-        store.save(self._make_trace(flow_type="analyze"))
-        store.save(self._make_trace(flow_type="generate"))
+        store.save(self._make_trace(flow_type="script"))
+        store.save(self._make_trace(flow_type="comic"))
         traces = store.query(limit=1)
         assert len(traces) == 1
 
@@ -293,11 +293,11 @@ class TestTraceStore:
         assert traces == []
 
     def test_store_query_returns_newest_first(self, store, trace_dir):
-        store.save(self._make_trace(flow_type="analyze"))
-        store.save(self._make_trace(flow_type="generate"))
+        store.save(self._make_trace(flow_type="script"))
+        store.save(self._make_trace(flow_type="comic"))
         traces = store.query()
-        assert traces[0].flow_type == "generate"
-        assert traces[1].flow_type == "analyze"
+        assert traces[0].flow_type == "comic"
+        assert traces[1].flow_type == "script"
 
     def test_store_cleanup_removes_old_files(self, store, trace_dir):
         store.save(self._make_trace(days_ago=10))
@@ -321,7 +321,7 @@ class TestTraceStore:
         line = file.read_text(encoding="utf-8").strip()
         parsed = FlowTrace.model_validate_json(line)
         assert parsed.trace_id == trace.trace_id
-        assert parsed.flow_type == "analyze"
+        assert parsed.flow_type == "script"
 
 
 # ── 路由测试 ─────────────────────────────────────────────────

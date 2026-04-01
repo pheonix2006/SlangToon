@@ -145,7 +145,7 @@ class TestGenerate:
             mp.setattr(httpx.AsyncClient, "post", mock_post)
             mp.setattr(httpx.AsyncClient, "get", mock_get)
             result = await client.generate(
-                prompt="generate a poster",
+                prompt="generate a comic strip",
                 image_base64="abc123base64",
             )
 
@@ -180,7 +180,7 @@ class TestGenerate:
             mp.setattr(httpx.AsyncClient, "post", mock_post)
             mp.setattr(httpx.AsyncClient, "get", mock_get)
             await client.generate(
-                prompt="a beautiful poster",
+                prompt="a manga-style comic",
                 image_base64="rawbase64data",
                 image_format="png",
                 size="1024*1024",
@@ -197,7 +197,7 @@ class TestGenerate:
         assert len(messages) == 1
         content = messages[0]["content"]
         assert content[0]["image"] == "data:image/png;base64,rawbase64data"
-        assert content[1]["text"] == "a beautiful poster"
+        assert content[1]["text"] == "a manga-style comic"
 
     @pytest.mark.asyncio
     async def test_base64_with_data_prefix_stripped_in_payload(self) -> None:
