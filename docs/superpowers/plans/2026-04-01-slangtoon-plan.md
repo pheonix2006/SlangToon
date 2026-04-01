@@ -567,7 +567,22 @@ class TestChatTextOnly:
         assert mock_ac.post.call_count == 2
 ```
 
-> **Note:** The test file needs `import httpx` at the top. Check if it already exists; if not, add it. The `settings_mock` fixture should already exist in the test file (it mocks Settings with minimal values).
+> **Note:** The test file needs `import httpx` at the top. Check if it already exists; if not, add it. The `settings_mock` fixture should already exist in the test file (it mocks Settings with minimal values). If not, add a fixture:
+> ```python
+> @pytest.fixture
+> def settings_mock():
+>     from app.config import Settings
+>     return Settings(
+>         openai_api_key="test-key",
+>         openai_base_url="https://test.example.com/v4",
+>         openai_model="test-model",
+>         vision_llm_max_tokens=1024,
+>         vision_llm_timeout=10,
+>         vision_llm_max_retries=1,
+>     )
+> ```
+>
+> **Mock pattern note:** Check the existing `test_llm_client.py` for the mock pattern it uses (likely `pytest.MonkeyPatch` or a custom `_make_settings()` helper). Follow the SAME pattern for new tests to ensure consistency. The example code above uses `unittest.mock.patch` — adapt to match the existing file's style.
 
 - [ ] **Step 2: Run test — verify it fails**
 
@@ -666,6 +681,8 @@ Expected: All PASS (both old `chat_with_vision` tests and new `chat()` tests).
 git add backend/app/services/llm_client.py tests/backend/unit/test_llm_client.py
 git commit -m "feat: add text-only chat() method to LLMClient"
 ```
+
+> **Mock pattern note for Task 4:** The `generate_from_text()` test in Task 4, Step 1 must follow the same mock pattern as the existing `test_image_gen_client.py` (check if it uses `pytest.MonkeyPatch` or `unittest.mock.patch`). Adapt the test code accordingly.
 
 ---
 
@@ -1314,12 +1331,31 @@ async def generate_comic(script_data: dict, settings: Settings) -> dict:
 
     logger.info("Comic saved: history_id=%s, url=%s", history_id, urls["comic_url"])
 
+    # Save to history
+    from app.services.history_service import HistoryService
+    history_svc = HistoryService(settings.history_file, settings.max_history_records)
+    history_svc.add({
+        "id": history_id,
+        "slang": script_data["slang"],
+        "origin": script_data["origin"],
+        "explanation": script_data["explanation"],
+        "panel_count": script_data["panel_count"],
+        "comic_url": urls["comic_url"],
+        "thumbnail_url": urls["thumbnail_url"],
+        "comic_prompt": prompt,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
     return {
         "comic_url": urls["comic_url"],
         "thumbnail_url": urls["thumbnail_url"],
         "history_id": history_id,
     }
 ```
+
+> **Note:** The `HistoryService` import is done inside the function to keep the module import surface clean. An alternative is to accept a `HistoryService` parameter — either approach works.
+
+**Trace integration** (from design spec): Both `script_service.py` and `comic_service.py` should integrate with `FlowSession` for request tracing. This is deferred — add trace calls in a follow-up if needed. The services use `logger` for logging which provides basic observability.
 
 - [ ] **Step 8: Run tests**
 
@@ -1956,6 +1992,7 @@ git commit -m "feat: update frontend types, constants, and API client for SlangT
 **Files:**
 - Delete: `frontend/src/components/StyleSelection/`, `StyleCard/`, `PosterDisplay/`, `GestureOverlay/`, `Countdown/`
 - Delete: `frontend/src/utils/captureFrame.ts`
+- Delete: `frontend/src/hooks/useCountdown.ts` and `frontend/src/hooks/useCountdown.test.ts` (no longer used — no COUNTDOWN state)
 - Create: `frontend/src/components/ScriptPreview/ScriptPreview.tsx`
 - Create: `frontend/src/components/ComicDisplay/ComicDisplay.tsx`
 - Create: `frontend/src/components/HistoryList/HistoryList.tsx`
@@ -2155,6 +2192,7 @@ git rm -r frontend/src/components/PosterDisplay/
 git rm -r frontend/src/components/GestureOverlay/
 git rm -r frontend/src/components/Countdown/
 git rm frontend/src/utils/captureFrame.ts
+git rm frontend/src/hooks/useCountdown.ts frontend/src/hooks/useCountdown.test.ts
 ```
 
 Also delete their test files if they exist (check for `*.test.tsx` / `*.test.ts` alongside deleted components).
@@ -2415,7 +2453,7 @@ function App() {
         {appState === AppState.COMIC_READY && (
           <ComicDisplay
             comicUrl={comicUrl}
-            slang={scriptData?.sllang ?? ''}
+            slang={scriptData?.slang ?? ''}
             onNew={goHome}
             onGoToHistory={goHistory}
           />
