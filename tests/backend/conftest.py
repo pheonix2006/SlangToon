@@ -20,11 +20,9 @@ def tmp_data_dir(tmp_path):
     """创建临时 data 目录结构并设置环境变量。"""
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    (data_dir / "photos").mkdir()
-    (data_dir / "posters").mkdir()
+    (data_dir / "comics").mkdir()
     (data_dir / "history.json").write_text("[]", encoding="utf-8")
-    os.environ["PHOTO_STORAGE_DIR"] = str(data_dir / "photos")
-    os.environ["POSTER_STORAGE_DIR"] = str(data_dir / "posters")
+    os.environ["COMIC_STORAGE_DIR"] = str(data_dir / "comics")
     os.environ["HISTORY_FILE"] = str(data_dir / "history.json")
     (data_dir / "traces").mkdir()
     os.environ["TRACE_DIR"] = str(data_dir / "traces")
@@ -43,32 +41,44 @@ async def client(tmp_data_dir):
 
 
 @pytest.fixture
-def sample_image_base64() -> str:
-    img = Image.new("RGB", (100, 100), color="red")
-    buf = BytesIO()
-    img.save(buf, format="JPEG")
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
+def mock_script_data():
+    """Mock slang + comic script response from LLM."""
+    return {
+        "slang": "Break a leg",
+        "origin": "Western theater tradition",
+        "explanation": "Used to wish good luck before a performance",
+        "panel_count": 4,
+        "panels": [
+            {
+                "scene": "A nervous actor paces backstage, clutching a crumpled script. The stage manager glances at the clock.",
+                "dialogue": 'Narrator: "It was opening night..."',
+            },
+            {
+                "scene": "Friends gather around the actor, giving thumbs up with warm smiles.",
+                "dialogue": 'Friend: "You\'ve got this!"',
+            },
+            {
+                "scene": "The actor steps onto the stage under a bright spotlight. The audience is a sea of silhouettes.",
+                "dialogue": "",
+            },
+            {
+                "scene": "Standing ovation! Confetti falls. The actor beams with joy and happy tears.",
+                "dialogue": 'Narrator: "Break a leg indeed."',
+            },
+        ],
+    }
 
 
 @pytest.fixture
-def mock_llm_options():
-    return [
-        {"name": "主题A", "brief": "描述A"},
-        {"name": "主题B", "brief": "描述B"},
-        {"name": "主题C", "brief": "描述C"},
-        {"name": "主题D", "brief": "描述D"},
-        {"name": "主题E", "brief": "描述E"},
-    ]
+def mock_script_response_text(mock_script_data):
+    """Mock LLM JSON response text for script generation."""
+    return json.dumps(mock_script_data)
 
 
 @pytest.fixture
-def mock_llm_response_text(mock_llm_options):
-    return json.dumps({"options": mock_llm_options})
-
-
-@pytest.fixture
-def mock_compose_response():
-    return json.dumps({"prompt": "masterpiece, best quality, ultra-detailed, 8K resolution, full body portrait of a person standing heroically in a cyberpunk city street at night, neon signs reflecting on wet pavement, cinematic wide shot, volumetric lighting, deep sapphire blue and iridescent cyan color palette, leather jacket and glowing accessories, rain particles, 85mm lens, shallow depth of field"})
+def mock_comic_prompt():
+    """Mock visual prompt for Qwen Image 2.0."""
+    return "A 4-panel horizontal comic strip in manga style, 16:9 layout. Panel 1: A nervous actor paces backstage holding a crumpled script. Panel 2: Friends give thumbs up. Panel 3: Actor steps onto spotlight stage. Panel 4: Standing ovation with confetti. Speech bubbles with dialogue. Clean line art, warm color palette."
 
 
 @pytest.fixture

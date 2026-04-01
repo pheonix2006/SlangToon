@@ -1,47 +1,36 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { AppState } from './types';
-import type { GestureType, StyleOption, HistoryItem } from './types';
+import type { ScriptData, HistoryItem } from './types';
 import { useCamera } from './hooks/useCamera';
 import { useGestureDetector } from './hooks/useGestureDetector';
 import { useMediaPipeHands } from './hooks/useMediaPipeHands';
-import { useCountdown } from './hooks/useCountdown';
-import { analyzePhoto, generatePoster, getHistory } from './services/api';
-import { captureFrame } from './utils/captureFrame';
+import { generateScript, generateComic, getHistory } from './services/api';
 import CameraView from './components/CameraView/CameraView';
-import GestureOverlay from './components/GestureOverlay/GestureOverlay';
-import Countdown from './components/Countdown/Countdown';
-import StyleSelection from './components/StyleSelection/StyleSelection';
-import PosterDisplay from './components/PosterDisplay/PosterDisplay';
+import ScriptPreview from './components/ScriptPreview/ScriptPreview';
+import ComicDisplay from './components/ComicDisplay/ComicDisplay';
 import HistoryList from './components/HistoryList/HistoryList';
 import ErrorDisplay from './components/ErrorDisplay';
+import LoadingSpinner from './components/LoadingSpinner';
 
 function App() {
-  // ── State machine ──────────────────────────────────────────
+  // ── State machine ──
   const [appState, setAppState] = useState<AppState>(AppState.CAMERA_READY);
-  const [photo, setPhoto] = useState<string>('');
-  const [styleOptions, setStyleOptions] = useState<StyleOption[]>([]);
-  const [selectedOption, setSelectedOption] = useState<StyleOption | null>(null);
-  const [posterUrl, setPosterUrl] = useState<string>('');
+  const [scriptData, setScriptData] = useState<ScriptData | null>(null);
+  const [comicUrl, setComicUrl] = useState<string>('');
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [gesture, setGesture] = useState<GestureType>('none');
-  const [gestureConfidence, setGestureConfidence] = useState<number>(0);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Ref to keep latest appState accessible in callbacks without re-subscribing
   const appStateRef = useRef<AppState>(appState);
   useEffect(() => {
     appStateRef.current = appState;
   }, [appState]);
 
-  // ── Navigation helpers ─────────────────────────────────────
+  // ── Navigation helpers ──
   const goHome = useCallback(() => {
-    setPhoto('');
-    setStyleOptions([]);
-    setSelectedOption(null);
-    setPosterUrl('');
+    setScriptData(null);
+    setComicUrl('');
     setAppState(AppState.CAMERA_READY);
-    // Note: do NOT clear error here — caller should manage error display
   }, []);
 
   const goHistory = useCallback(() => {
@@ -49,38 +38,44 @@ function App() {
     setAppState(AppState.HISTORY);
   }, []);
 
-  // ── Camera hook ────────────────────────────────────────────
+  // ── Camera hook ──
   const { videoRef, isReady, error: cameraError, restart: restartCamera } = useCamera();
 
-  // ── Gesture handling ───────────────────────────────────────
-  const onGestureDetected = useCallback(
-    (event: { gesture: GestureType; confidence: number }) => {
-      setGesture(event.gesture);
-      setGestureConfidence(event.confidence);
+  // ── Script generation ──
+  const handleGenerateScript = useCallback(async () => {
+    setError(null);
+    setAppState(AppState.SCRIPT_LOADING);
 
+    try {
+      const response = await generateScript();
+      setScriptData(response.data);
+      setAppState(AppState.SCRIPT_PREVIEW);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate script';
+      setError(msg);
+      setAppState(AppState.CAMERA_READY);
+    }
+  }, []);
+
+  // ── Gesture handling ──
+  const onGestureDetected = useCallback(
+    (event: { gesture: 'ok' | 'open_palm' | 'none'; confidence: number }) => {
       const state = appStateRef.current;
 
-      // OK gesture in CAMERA_READY → start countdown
       if (event.gesture === 'ok' && state === AppState.CAMERA_READY) {
-        setAppState(AppState.COUNTDOWN);
+        handleGenerateScript();
         return;
       }
 
-      // Open palm anywhere except POSTER_READY → go back to camera
-      if (event.gesture === 'open_palm' && state !== AppState.POSTER_READY) {
+      if (event.gesture === 'open_palm' && state !== AppState.COMIC_READY) {
         goHome();
-        return;
       }
     },
-    [goHome],
+    [goHome, handleGenerateScript],
   );
 
-  // gestureDetector MUST be declared BEFORE handleMediaPipeResults
-  const { processLandmarks } = useGestureDetector({
-    onGestureDetected,
-  });
+  const { processLandmarks } = useGestureDetector({ onGestureDetected });
 
-  // handleMediaPipeResults MUST be declared BEFORE useMediaPipeHands
   const handleMediaPipeResults = useCallback(
     (landmarks: { x: number; y: number; z: number }[]) => {
       if (landmarks.length > 0) {
@@ -90,75 +85,36 @@ function App() {
     [processLandmarks],
   );
 
-  // ── MediaPipe hands hook ───────────────────────────────────
   const { canvasRef } = useMediaPipeHands({
     videoRef,
     onResults: handleMediaPipeResults,
   });
 
-  // ── Countdown hook ─────────────────────────────────────────
-  const onCountdownComplete = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video) {
-      setError('无法访问摄像头，请重试');
-      goHome();
-      return;
-    }
+  // ── Comic generation ──
+  const handleGenerateComic = useCallback(async () => {
+    if (!scriptData) return;
+
+    setError(null);
+    setAppState(AppState.COMIC_GENERATING);
 
     try {
-      // Capture frame
-      const base64Photo = captureFrame(video);
-      setPhoto(base64Photo);
-
-      // Transition to analyzing
-      console.log('[FlowTrace] state:', AppState.ANALYZING, '| action:', 'analyze_start', '| image_size:', base64Photo.length);
-      setAppState(AppState.ANALYZING);
-
-      // Analyze photo for style recommendations
-      const response = await analyzePhoto(base64Photo);
-      setStyleOptions(response.data.options);
-
-      // Transition to style selection
-      console.log('[FlowTrace] state:', AppState.STYLE_SELECTION, '| options_count:', response.data.options.length);
-      setAppState(AppState.STYLE_SELECTION);
+      const response = await generateComic({
+        slang: scriptData.slang,
+        origin: scriptData.origin,
+        explanation: scriptData.explanation,
+        panel_count: scriptData.panel_count,
+        panels: scriptData.panels,
+      });
+      setComicUrl(response.data.comic_url);
+      setAppState(AppState.COMIC_READY);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '拍照失败，请重试';
-      console.error('[App] Analyze failed:', msg);
+      const msg = err instanceof Error ? err.message : 'Failed to generate comic';
       setError(msg);
-      // Stay on camera view so user can see the error and retry
-      goHome();
+      setAppState(AppState.SCRIPT_PREVIEW);
     }
-  }, [videoRef, goHome]);
+  }, [scriptData]);
 
-  const { remaining } = useCountdown({
-    seconds: 3,
-    active: appState === AppState.COUNTDOWN,
-    onComplete: onCountdownComplete,
-  });
-
-  // ── Style selection handler ────────────────────────────────
-  const handleSelectStyle = useCallback(
-    async (style: StyleOption) => {
-      setSelectedOption(style);
-      setError(null);
-      console.log('[FlowTrace] state:', AppState.GENERATING, '| style:', style.name, '| brief:', style.brief);
-      setAppState(AppState.GENERATING);
-
-      try {
-        const response = await generatePoster(photo, style.name, style.brief);
-        setPosterUrl(response.data.poster_url);
-        console.log('[FlowTrace] state:', AppState.POSTER_READY, '| poster_url:', response.data.poster_url);
-        setAppState(AppState.POSTER_READY);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '生成海报失败，请重试';
-        setError(msg);
-        setAppState(AppState.STYLE_SELECTION);
-      }
-    },
-    [photo],
-  );
-
-  // ── History data fetching ──────────────────────────────────
+  // ── History ──
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     setError(null);
@@ -166,47 +122,22 @@ function App() {
       const response = await getHistory(1, 20);
       setHistoryItems(response.data.items);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '加载历史记录失败';
+      const msg = err instanceof Error ? err.message : 'Failed to load history';
       setError(msg);
     } finally {
       setHistoryLoading(false);
     }
   }, []);
 
-  // Fetch history when entering HISTORY state
   useEffect(() => {
     if (appState === AppState.HISTORY) {
       fetchHistory();
     }
   }, [appState, fetchHistory]);
 
-  // ── Poster actions ─────────────────────────────────────────
-  const handleRegenerate = useCallback(async () => {
-    if (!selectedOption) return;
-    setAppState(AppState.GENERATING);
-    setError(null);
+  // ── Render ──
+  const showCamera = appState === AppState.CAMERA_READY;
 
-    try {
-      const response = await generatePoster(photo, selectedOption.name, selectedOption.brief);
-      setPosterUrl(response.data.poster_url);
-      setAppState(AppState.POSTER_READY);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '重新生成失败';
-      setError(msg);
-      setAppState(AppState.POSTER_READY);
-    }
-  }, [photo, selectedOption]);
-
-  // ── Determine whether to show camera view ──────────────────
-  const showCamera =
-    appState === AppState.CAMERA_READY ||
-    appState === AppState.COUNTDOWN;
-
-  const showGestureOverlay =
-    appState === AppState.CAMERA_READY ||
-    appState === AppState.COUNTDOWN;
-
-  // ── Render ─────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       {/* Header */}
@@ -215,139 +146,99 @@ function App() {
           className="text-xl font-bold cursor-pointer select-none"
           onClick={goHome}
         >
-          Pose Art Generator
+          SlangToon
         </h1>
         <button
           className="px-4 py-2 text-sm bg-gray-700 rounded hover:bg-gray-600 transition-colors"
           onClick={goHistory}
         >
-          历史记录
+          History
         </button>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center overflow-auto">
-        {/* ── Camera + Countdown overlay ─────────────────── */}
         {showCamera && (
           <div className="relative w-full max-w-3xl aspect-video bg-gray-800 rounded-xl overflow-hidden">
-            {/* video element must always be in DOM so useCamera can attach stream */}
             <CameraView
               videoRef={videoRef}
               canvasRef={canvasRef}
               className={`w-full h-full ${isReady ? '' : 'invisible'}`}
             />
-            {isReady && appState === AppState.COUNTDOWN && <Countdown remaining={remaining} />}
             {!isReady && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
                 {cameraError ? (
-                  <ErrorDisplay
-                    message={cameraError}
-                    onRetry={restartCamera}
-                    retryText="重新启动摄像头"
-                  />
+                  <ErrorDisplay message={cameraError} onRetry={restartCamera} retryText="Restart Camera" />
                 ) : (
-                  <p className="text-gray-400">正在启动摄像头...</p>
+                  <p className="text-gray-400">Starting camera...</p>
                 )}
               </div>
             )}
           </div>
         )}
 
-        {/* ── Gesture overlay ────────────────────────────── */}
-        {showGestureOverlay && isReady && (
-          <GestureOverlay gesture={gesture} confidence={gestureConfidence} />
-        )}
-
-        {/* ── Hint text below camera ─────────────────────── */}
-        {appState === AppState.CAMERA_READY && isReady && (
+        {showCamera && isReady && (
           <div className="mt-4 text-center">
-            {error && (
-              <p className="text-red-400 text-sm mb-2">{error}</p>
-            )}
+            {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
             <p className="text-gray-400 text-sm">
-              摆出 <span className="text-green-400 font-medium">OK 手势</span> 拍照
+              Show <span className="text-green-400 font-medium">OK sign</span> to generate
               &nbsp;&middot;&nbsp;
-              摆出 <span className="text-green-400 font-medium">张开手掌</span> 返回
+              Show <span className="text-green-400 font-medium">open palm</span> to go back
             </p>
           </div>
         )}
 
-        {/* ── Analyzing state ────────────────────────────── */}
-        {appState === AppState.ANALYZING && (
+        {(appState === AppState.SCRIPT_LOADING || appState === AppState.COMIC_GENERATING) && (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
-            {error ? (
-              <ErrorDisplay message={error} onRetry={goHome} retryText="返回重试" />
-            ) : (
-              <>
-                <div className="h-12 w-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-gray-400 text-lg">正在分析照片...</p>
-                <p className="text-gray-600 text-sm">Vision LLM 分析中，通常需要 10-30 秒</p>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ── Style selection ────────────────────────────── */}
-        {appState === AppState.STYLE_SELECTION && (
-          <div className="w-full max-w-4xl px-6 py-8">
-            <StyleSelection
-              styles={styleOptions}
-              selectedStyle={selectedOption}
-              onSelectStyle={handleSelectStyle}
-              error={error}
-              onRetry={goHome}
-              photoThumbnail={photo}
-            />
-          </div>
-        )}
-
-        {/* ── Generating state ───────────────────────────── */}
-        {appState === AppState.GENERATING && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4">
-            {error ? (
-              <ErrorDisplay message={error} onRetry={() => { setError(null); setAppState(AppState.STYLE_SELECTION); }} retryText="返回选择" />
-            ) : (
-              <>
-                <div className="h-16 w-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-white text-lg font-medium">正在生成海报...</p>
-                <p className="text-gray-500 text-sm">AI 构思构图 + 生成图片中，通常需要 30-90 秒</p>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ── Poster display ─────────────────────────────── */}
-        {appState === AppState.POSTER_READY && (
-          <div className="w-full max-w-2xl px-6 py-8">
             {error ? (
               <ErrorDisplay
                 message={error}
-                onRetry={handleRegenerate}
-                retryText="重新生成"
+                onRetry={
+                  appState === AppState.SCRIPT_LOADING
+                    ? goHome
+                    : handleGenerateComic
+                }
+                retryText="Retry"
               />
             ) : (
-              <PosterDisplay
-                posterUrl={posterUrl}
-                styleName={selectedOption?.name}
-                onRegenerate={handleRegenerate}
-                onRetake={goHome}
-                onGoToHistory={goHistory}
-              />
+              <>
+                <LoadingSpinner />
+                <p className="text-gray-400 text-lg">
+                  {appState === AppState.SCRIPT_LOADING
+                    ? 'Creating something fun...'
+                    : 'Drawing your comic...'}
+                </p>
+              </>
             )}
           </div>
         )}
 
-        {/* ── History view ───────────────────────────────── */}
+        {appState === AppState.SCRIPT_PREVIEW && scriptData && (
+          <ScriptPreview
+            data={scriptData}
+            onShuffle={handleGenerateScript}
+            onGenerate={handleGenerateComic}
+            isLoading={false}
+          />
+        )}
+
+        {appState === AppState.COMIC_READY && (
+          <ComicDisplay
+            comicUrl={comicUrl}
+            slang={scriptData?.slang ?? ''}
+            onNew={goHome}
+            onGoToHistory={goHistory}
+          />
+        )}
+
         {appState === AppState.HISTORY && (
-          <div className="w-full max-w-4xl px-6 py-8">
-            <HistoryList
-              items={historyItems}
-              isLoading={historyLoading}
-              error={error}
-              onRetry={fetchHistory}
-              onBack={goHome}
-            />
-          </div>
+          <HistoryList
+            items={historyItems}
+            isLoading={historyLoading}
+            error={error}
+            onRetry={fetchHistory}
+            onBack={goHome}
+          />
         )}
       </main>
     </div>

@@ -48,7 +48,7 @@ export default function HistoryList({
     }
   };
 
-  // Full poster view
+  // Full comic view
   if (selectedItem) {
     return (
       <div className="flex flex-col items-center gap-4 w-full max-w-2xl mx-auto">
@@ -70,20 +70,25 @@ export default function HistoryList({
               d="M15 19l-7-7 7-7"
             />
           </svg>
-          返回列表
+          Back to list
         </button>
 
-        {/* Full poster image */}
+        {/* Full comic image */}
         <img
-          src={selectedItem.poster_url}
-          alt="海报"
+          src={selectedItem.comic_url}
+          alt={`Comic for "${selectedItem.slang}"`}
           className="w-full rounded-xl border border-gray-700"
         />
 
-        {/* Poster info */}
+        {/* Comic info */}
         <div className="text-center">
-          <p className="text-gray-400 text-sm">
-            风格: <span className="text-cyan-400">{selectedItem.style_name}</span>
+          <p className="text-gray-300 font-medium">
+            &quot;{selectedItem.slang}&quot;
+          </p>
+          <p className="text-gray-400 text-sm mt-1">
+            Origin: <span className="text-gray-300">{selectedItem.origin}</span>
+            &nbsp;&middot;&nbsp;
+            {selectedItem.panel_count} panels
           </p>
           <p className="text-gray-500 text-xs mt-1">
             {formatDate(selectedItem.created_at)}
@@ -98,7 +103,7 @@ export default function HistoryList({
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <div className="h-10 w-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-gray-400 mt-3">加载历史记录...</p>
+        <p className="text-gray-400 mt-3">Loading history...</p>
       </div>
     );
   }
@@ -113,7 +118,7 @@ export default function HistoryList({
             onClick={onRetry}
             className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
           >
-            重试
+            Retry
           </button>
         )}
       </div>
@@ -144,7 +149,7 @@ export default function HistoryList({
             </svg>
           </button>
         )}
-        <h2 className="text-2xl font-bold text-white">历史记录</h2>
+        <h2 className="text-2xl font-bold text-white">History</h2>
       </div>
 
       {/* Empty state */}
@@ -163,8 +168,8 @@ export default function HistoryList({
               d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
             />
           </svg>
-          <p className="text-gray-500 text-lg">暂无历史记录</p>
-          <p className="text-gray-600 text-sm">拍摄照片后将在这里看到生成的海报</p>
+          <p className="text-gray-500 text-lg">No history yet</p>
+          <p className="text-gray-600 text-sm">Your generated comics will appear here</p>
         </div>
       ) : (
         /* History items grid */
@@ -178,19 +183,19 @@ export default function HistoryList({
               {/* Thumbnail */}
               <div className="aspect-[3/4] overflow-hidden">
                 <img
-                  src={item.thumbnail_url || item.poster_url}
-                  alt={item.style_name}
+                  src={item.thumbnail_url || item.comic_url}
+                  alt={item.slang}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                 />
               </div>
 
               {/* Info */}
               <div className="px-3 pb-3 text-left">
-                <p className="text-sm font-medium text-gray-200 truncate">
-                  {item.style_name}
+                <p className="text-sm font-medium text-yellow-400 truncate">
+                  &quot;{item.slang}&quot;
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {formatDate(item.created_at)}
+                  {item.panel_count} panels &middot; {formatDate(item.created_at)}
                 </p>
               </div>
             </button>

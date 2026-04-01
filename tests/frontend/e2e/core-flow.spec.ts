@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockAnalyzeAPI, mockGenerateAPI, mockHistoryAPI } from './support/test-utils';
+import { mockScriptAPI, mockComicAPI, mockHistoryAPI, mockScriptData } from './support/test-utils';
 
 test.describe('Backend API Integration', () => {
   test('health endpoint responds', async ({ request }) => {
@@ -7,36 +7,36 @@ test.describe('Backend API Integration', () => {
     expect(resp.ok()).toBeTruthy();
     const body = await resp.json();
     expect(body.status).toBe('ok');
+    expect(body.app).toBe('SlangToon');
   });
 
-  test('analyze API returns valid structure', async ({ page }) => {
-    await mockAnalyzeAPI(page);
-    const resp = await page.request.post('/api/analyze', {
-      data: { image_base64: 'fake', image_format: 'jpeg' },
+  test('generate-script API returns valid structure', async ({ page }) => {
+    await mockScriptAPI(page);
+    const resp = await page.request.post('/api/generate-script', {
+      data: {},
     });
     expect(resp.ok()).toBeTruthy();
     const body = await resp.json();
     expect(body.code).toBe(0);
-    expect(body.data.options).toHaveLength(3);
-    expect(body.data.options[0]).toHaveProperty('name');
-    expect(body.data.options[0]).toHaveProperty('brief');
-    expect(body.data.options[0]).toHaveProperty('prompt');
+    expect(body.data.slang).toBeTruthy();
+    expect(body.data.origin).toBeTruthy();
+    expect(body.data.explanation).toBeTruthy();
+    expect(body.data.panel_count).toBeGreaterThanOrEqual(4);
+    expect(body.data.panel_count).toBeLessThanOrEqual(6);
+    expect(body.data.panels).toHaveLength(body.data.panel_count);
+    expect(body.data.panels[0]).toHaveProperty('scene');
+    expect(body.data.panels[0]).toHaveProperty('dialogue');
   });
 
-  test('generate API returns valid structure', async ({ page }) => {
-    await mockGenerateAPI(page);
-    const resp = await page.request.post('/api/generate', {
-      data: {
-        image_base64: 'fake',
-        image_format: 'jpeg',
-        prompt: 'test prompt',
-        style_name: 'cyberpunk',
-      },
+  test('generate-comic API returns valid structure', async ({ page }) => {
+    await mockComicAPI(page);
+    const resp = await page.request.post('/api/generate-comic', {
+      data: mockScriptData,
     });
     expect(resp.ok()).toBeTruthy();
     const body = await resp.json();
     expect(body.code).toBe(0);
-    expect(body.data.poster_url).toBeTruthy();
+    expect(body.data.comic_url).toBeTruthy();
     expect(body.data.thumbnail_url).toBeTruthy();
     expect(body.data.history_id).toBeTruthy();
   });
@@ -52,59 +52,77 @@ test.describe('Backend API Integration', () => {
 });
 
 test.describe('Error Handling', () => {
-  test('analyze error returns correct code', async ({ page }) => {
-    await page.route('**/api/analyze', async (route) => {
+  test('generate-script error returns correct code', async ({ page }) => {
+    await page.route('**/api/generate-script', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ code: 50001, message: 'LLM 调用失败' }),
       });
     });
-    const resp = await page.request.post('/api/analyze', {
-      data: { image_base64: 'fake', image_format: 'jpeg' },
+    const resp = await page.request.post('/api/generate-script', {
+      data: {},
     });
     const body = await resp.json();
     expect(body.code).toBe(50001);
     expect(body.message).toBeTruthy();
   });
 
-  test('generate error returns correct code', async ({ page }) => {
-    await page.route('**/api/generate', async (route) => {
+  test('generate-comic error returns correct code', async ({ page }) => {
+    await page.route('**/api/generate-comic', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 50003, message: '图片生成失败' }),
+        body: JSON.stringify({ code: 50005, message: '图片生成失败' }),
       });
     });
-    const resp = await page.request.post('/api/generate', {
-      data: { image_base64: 'fake', image_format: 'jpeg', prompt: 'p', style_name: 's' },
+    const resp = await page.request.post('/api/generate-comic', {
+      data: mockScriptData,
     });
     const body = await resp.json();
-    expect(body.code).toBe(50003);
+    expect(body.code).toBe(50005);
   });
 
-  test('invalid format returns validation error', async ({ page }) => {
-    await page.route('**/api/analyze', async (route) => {
-      await route.fulfill({ status: 422, body: 'Unprocessable Entity' });
-    });
-    const resp = await page.request.post('/api/analyze', {
-      data: { image_base64: 'fake', image_format: 'invalid' },
+  test('generate-comic with missing fields returns validation error', async ({ page }) => {
+    const resp = await page.request.post('http://localhost:8888/api/generate-comic', {
+      data: { slang: 'test' },
     });
     expect(resp.status()).toBe(422);
   });
 
-  test('schema validation rejects empty image', async ({ request }) => {
-    const resp = await request.post('http://localhost:8888/api/analyze', {
-      data: { image_base64: '', image_format: 'jpeg' },
+  test('generate-comic with empty body returns validation error', async ({ request }) => {
+    const resp = await request.post('http://localhost:8888/api/generate-comic', {
+      data: {},
     });
     expect(resp.status()).toBe(422);
   });
 
-  test('schema validation rejects missing fields', async ({ request }) => {
-    const resp = await request.post('http://localhost:8888/api/analyze', {
-      data: { image_format: 'jpeg' },
+  test('generate-comic with invalid panel_count returns validation error', async ({ page }) => {
+    const invalidData = {
+      ...mockScriptData,
+      panel_count: 10,
+      panels: Array(10).fill({ scene: 'test', dialogue: '' }),
+    };
+    const resp = await page.request.post('http://localhost:8888/api/generate-comic', {
+      data: invalidData,
     });
     expect(resp.status()).toBe(422);
+  });
+
+  test('generate-comic invalid script response error', async ({ page }) => {
+    await page.route('**/api/generate-comic', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 50002, message: '脚本响应解析失败' }),
+      });
+    });
+    const resp = await page.request.post('/api/generate-comic', {
+      data: mockScriptData,
+    });
+    const body = await resp.json();
+    expect(body.code).toBe(50002);
+    expect(body.message).toBeTruthy();
   });
 });
 

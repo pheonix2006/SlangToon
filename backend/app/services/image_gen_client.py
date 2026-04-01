@@ -196,6 +196,103 @@ class ImageGenClient:
             f"图像生成请求在 {self._max_retries} 次重试后仍然失败"
         ) from last_exc
 
+    async def generate_from_text(
+        self,
+        prompt: str,
+        size: str = "2688*1536",
+    ) -> str:
+        """Text-to-image — generate image from text prompt only.
+
+        Uses DashScope sync interface with prompt_extend=false for exact prompt control.
+        Returns base64-encoded image with data URI prefix.
+        """
+        url = f"{self._base_url}/services/aigc/multimodal-generation/generation"
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        payload = {
+            "model": self._model,
+            "input": {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"text": prompt},
+                        ],
+                    }
+                ]
+            },
+            "parameters": {
+                "n": 1,
+                "size": size,
+                "prompt_extend": False,
+            },
+        }
+
+        last_exc: Exception | None = None
+        logger.info("文本生图请求发送中 (model=%s, timeout=%.0fs)", self._model, self._timeout)
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+
+                    if resp.status_code >= 500:
+                        last_exc = ImageGenApiError(
+                            f"文本生图 API 服务端错误 {resp.status_code}: {resp.text[:500]}"
+                        )
+                        logger.warning(
+                            "文本生图 5xx (attempt %d/%d): %s",
+                            attempt, self._max_retries, repr(last_exc),
+                        )
+                        if attempt < self._max_retries:
+                            await self._backoff(attempt)
+                        continue
+
+                    if resp.status_code >= 400:
+                        raise ImageGenApiError(
+                            f"文本生图 API 客户端错误 {resp.status_code}: {resp.text[:500]}"
+                        )
+
+                    data = resp.json()
+                    image_url = parse_qwen_image_response(data)
+                    logger.info("文本生图 API 响应成功 (attempt %d/%d)", attempt, self._max_retries)
+
+                    return await self._download_as_base64(image_url)
+
+            except httpx.TimeoutException as exc:
+                # 超时不重试
+                raise ImageGenTimeoutError(
+                    f"文本生图请求超时 ({self._timeout}s)"
+                ) from exc
+
+            except (ImageGenApiError, ImageGenTimeoutError):
+                # 客户端错误 / 超时 — 已处理，直接抛出
+                raise
+
+            except httpx.ConnectError as exc:
+                last_exc = exc
+                logger.warning(
+                    "文本生图连接错误 (attempt %d/%d): %s",
+                    attempt, self._max_retries, repr(exc),
+                )
+                if attempt < self._max_retries:
+                    await self._backoff(attempt)
+
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "文本生图请求异常 (attempt %d/%d): %s",
+                    attempt, self._max_retries, repr(exc),
+                )
+                if attempt < self._max_retries:
+                    await self._backoff(attempt)
+
+        raise ImageGenApiError(
+            f"文本生图请求在 {self._max_retries} 次重试后仍然失败"
+        ) from last_exc
+
     # ------------------------------------------------------------------
     # 内部工具
     # ------------------------------------------------------------------

@@ -6,20 +6,24 @@ import type { HistoryItem } from '../../types';
 const mockItems: HistoryItem[] = [
   {
     id: '1',
-    style_name: '赛博朋克',
-    prompt: 'cyberpunk style',
-    poster_url: 'https://example.com/poster1.png',
+    slang: 'Slay',
+    origin: 'African American Vernacular English',
+    explanation: 'To do something exceptionally well',
+    panel_count: 4,
+    comic_url: 'https://example.com/comic1.png',
     thumbnail_url: 'https://example.com/thumb1.png',
-    photo_url: 'https://example.com/photo1.jpg',
+    comic_prompt: 'A comic about slaying...',
     created_at: '2026-03-28T10:00:00Z',
   },
   {
     id: '2',
-    style_name: '水墨画',
-    prompt: 'ink painting style',
-    poster_url: 'https://example.com/poster2.png',
+    slang: 'No cap',
+    origin: 'Atlanta hip-hop scene',
+    explanation: 'No lie, telling the truth',
+    panel_count: 3,
+    comic_url: 'https://example.com/comic2.png',
     thumbnail_url: 'https://example.com/thumb2.png',
-    photo_url: 'https://example.com/photo2.jpg',
+    comic_prompt: 'A comic about no cap...',
     created_at: '2026-03-27T08:00:00Z',
   },
 ];
@@ -29,38 +33,38 @@ const defaultProps = {
 };
 
 describe('HistoryList', () => {
-  it('shows empty state "暂无历史记录"', () => {
+  it('shows empty state "No history yet"', () => {
     render(<HistoryList items={[]} />);
 
-    expect(screen.getByText('暂无历史记录')).toBeInTheDocument();
+    expect(screen.getByText('No history yet')).toBeInTheDocument();
   });
 
-  it('renders history items with style names', () => {
+  it('renders history items with slang names', () => {
     render(<HistoryList {...defaultProps} />);
 
-    expect(screen.getByText('赛博朋克')).toBeInTheDocument();
-    expect(screen.getByText('水墨画')).toBeInTheDocument();
+    expect(screen.getByText('"Slay"')).toBeInTheDocument();
+    expect(screen.getByText('"No cap"')).toBeInTheDocument();
   });
 
-  it('shows detail view on item click with "返回列表" button', async () => {
+  it('shows detail view on item click with "Back to list" button', async () => {
     const user = userEvent.setup();
     render(<HistoryList {...defaultProps} />);
 
-    await user.click(screen.getByAltText('赛博朋克'));
+    await user.click(screen.getByAltText('Slay'));
 
-    expect(screen.getByText('返回列表')).toBeInTheDocument();
-    expect(screen.getByAltText('海报')).toBeInTheDocument();
+    expect(screen.getByText('Back to list')).toBeInTheDocument();
+    expect(screen.getByAltText('Comic for "Slay"')).toBeInTheDocument();
   });
 
   it('returns to list on back button click', async () => {
     const user = userEvent.setup();
     render(<HistoryList {...defaultProps} />);
 
-    await user.click(screen.getByAltText('赛博朋克'));
-    expect(screen.getByText('返回列表')).toBeInTheDocument();
+    await user.click(screen.getByAltText('Slay'));
+    expect(screen.getByText('Back to list')).toBeInTheDocument();
 
-    await user.click(screen.getByText('返回列表'));
-    expect(screen.queryByText('返回列表')).not.toBeInTheDocument();
-    expect(screen.getByText('赛博朋克')).toBeInTheDocument();
+    await user.click(screen.getByText('Back to list'));
+    expect(screen.queryByText('Back to list')).not.toBeInTheDocument();
+    expect(screen.getByText('"Slay"')).toBeInTheDocument();
   });
 });

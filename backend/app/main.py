@@ -8,14 +8,13 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 from app.logging_config import setup_logging
 from app.middleware import RequestIdMiddleware
-from app.routers import analyze, generate, history, traces
+from app.routers import script, comic, history, traces
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    Path(settings.photo_storage_dir).mkdir(parents=True, exist_ok=True)
-    Path(settings.poster_storage_dir).mkdir(parents=True, exist_ok=True)
+    Path(settings.comic_storage_dir).mkdir(parents=True, exist_ok=True)
     Path(settings.history_file).parent.mkdir(parents=True, exist_ok=True)
     # Trace cleanup on startup
     if settings.trace_enabled:
@@ -46,8 +45,8 @@ def create_app() -> FastAPI:
     data_dir = Path("data")
     if data_dir.exists():
         app.mount("/data", StaticFiles(directory="data"), name="data")
-    app.include_router(analyze.router)
-    app.include_router(generate.router)
+    app.include_router(script.router)
+    app.include_router(comic.router)
     app.include_router(history.router)
     app.include_router(traces.router)
     return app
@@ -58,4 +57,4 @@ app = create_app()
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "app": "PoseArtGenerator"}
+    return {"status": "ok", "app": "SlangToon"}

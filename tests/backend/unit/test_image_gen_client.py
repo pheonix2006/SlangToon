@@ -145,7 +145,7 @@ class TestGenerate:
             mp.setattr(httpx.AsyncClient, "post", mock_post)
             mp.setattr(httpx.AsyncClient, "get", mock_get)
             result = await client.generate(
-                prompt="generate a poster",
+                prompt="generate a comic strip",
                 image_base64="abc123base64",
             )
 
@@ -180,7 +180,7 @@ class TestGenerate:
             mp.setattr(httpx.AsyncClient, "post", mock_post)
             mp.setattr(httpx.AsyncClient, "get", mock_get)
             await client.generate(
-                prompt="a beautiful poster",
+                prompt="a manga-style comic",
                 image_base64="rawbase64data",
                 image_format="png",
                 size="1024*1024",
@@ -197,7 +197,7 @@ class TestGenerate:
         assert len(messages) == 1
         content = messages[0]["content"]
         assert content[0]["image"] == "data:image/png;base64,rawbase64data"
-        assert content[1]["text"] == "a beautiful poster"
+        assert content[1]["text"] == "a manga-style comic"
 
     @pytest.mark.asyncio
     async def test_base64_with_data_prefix_stripped_in_payload(self) -> None:
@@ -348,3 +348,173 @@ class TestGenerate:
         assert result.startswith("data:image/png;base64,")
         b64_part = result.split(",", 1)[1]
         assert base64.b64decode(b64_part) == image_bytes
+
+
+# ---------------------------------------------------------------------------
+# generate_from_text — text-to-image
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateFromText:
+    """Test text-to-image generation (no reference image)."""
+
+    def _fake_url_response(self, url: str) -> httpx.Response:
+        body = json.dumps({
+            "output": {
+                "choices": [
+                    {
+                        "message": {
+                            "content": [{"image": url}],
+                            "role": "assistant",
+                        }
+                    }
+                ]
+            }
+        })
+        return httpx.Response(
+            status_code=200,
+            content=body.encode(),
+            request=httpx.Request("POST", "https://example.com"),
+        )
+
+    @pytest.mark.asyncio
+    async def test_successful_text_to_image(self) -> None:
+        """generate_from_text() should return base64 image data."""
+        settings = _make_settings()
+        client = ImageGenClient(settings)
+        image_url = "https://dash.example.com/comic.png"
+        image_bytes = b"comic-image-data"
+
+        async def mock_post(*args, **kwargs):
+            return self._fake_url_response(image_url)
+
+        async def mock_get(self_client, url, **kwargs):
+            return httpx.Response(
+                status_code=200,
+                content=image_bytes,
+                headers={"content-type": "image/png"},
+                request=httpx.Request("GET", url),
+            )
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            mp.setattr(httpx.AsyncClient, "get", mock_get)
+            result = await client.generate_from_text(
+                prompt="A 4-panel manga comic strip",
+            )
+
+        assert result.startswith("data:image/png;base64,")
+        b64_part = result.split(",", 1)[1]
+        assert base64.b64decode(b64_part) == image_bytes
+
+    @pytest.mark.asyncio
+    async def test_text_only_payload_structure(self) -> None:
+        """generate_from_text() should NOT include image in payload."""
+        settings = _make_settings()
+        client = ImageGenClient(settings)
+        captured: dict = {}
+
+        async def mock_post(self_client, url, json=None, headers=None):
+            captured["json"] = json
+            return self._fake_url_response("https://img.example.com/fake.png")
+
+        async def mock_get(self_client, url, **kwargs):
+            return httpx.Response(
+                status_code=200,
+                content=b"img",
+                headers={"content-type": "image/png"},
+                request=httpx.Request("GET", url),
+            )
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            mp.setattr(httpx.AsyncClient, "get", mock_get)
+            await client.generate_from_text(
+                prompt="A comic strip",
+                size="2688*1536",
+            )
+
+        payload = captured["json"]
+        # Verify text-only messages content
+        msg_content = payload["input"]["messages"][0]["content"]
+        assert any(item.get("text") == "A comic strip" for item in msg_content)
+        assert not any(item.get("image") for item in msg_content)
+        # Verify parameters
+        assert payload["parameters"]["size"] == "2688*1536"
+        assert payload["parameters"]["prompt_extend"] is False
+
+    @pytest.mark.asyncio
+    async def test_text_timeout_raises(self) -> None:
+        """Timeout should raise ImageGenTimeoutError without retry."""
+        settings = _make_settings(qwen_image_max_retries=3)
+        client = ImageGenClient(settings)
+        call_count = 0
+
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            raise httpx.ReadTimeout("timeout")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            with pytest.raises(ImageGenTimeoutError):
+                await client.generate_from_text(prompt="test")
+
+        assert call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_text_4xx_no_retry(self) -> None:
+        """4xx should raise ImageGenApiError without retry."""
+        settings = _make_settings(qwen_image_max_retries=3)
+        client = ImageGenClient(settings)
+        call_count = 0
+
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            return httpx.Response(
+                status_code=400,
+                content=b'{"error": "bad"}',
+                request=httpx.Request("POST", "https://example.com"),
+            )
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            with pytest.raises(ImageGenApiError):
+                await client.generate_from_text(prompt="test")
+
+        assert call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_text_5xx_retries(self) -> None:
+        """5xx should trigger retries."""
+        settings = _make_settings(qwen_image_max_retries=3)
+        client = ImageGenClient(settings)
+        call_count = 0
+
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                return httpx.Response(
+                    status_code=500,
+                    content=b"server error",
+                    request=httpx.Request("POST", "https://example.com"),
+                )
+            return self._fake_url_response("https://img.example.com/ok.png")
+
+        async def mock_get(self_client, url, **kwargs):
+            return httpx.Response(
+                status_code=200,
+                content=b"img",
+                headers={"content-type": "image/png"},
+                request=httpx.Request("GET", url),
+            )
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            mp.setattr(httpx.AsyncClient, "get", mock_get)
+            result = await client.generate_from_text(prompt="test")
+
+        assert call_count == 3
+        assert result.startswith("data:image/png;base64,")

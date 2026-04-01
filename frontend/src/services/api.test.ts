@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { analyzePhoto, generatePoster, getHistory } from './api';
+import { generateScript, generateComic, getHistory } from './api';
 
 const mockFetch = vi.fn();
 const originalFetch = globalThis.fetch;
@@ -18,6 +18,7 @@ function mockJsonResponse(data: unknown) {
     ok: true,
     status: 200,
     statusText: 'OK',
+    headers: { get: () => null },
     json: () => Promise.resolve(data),
   } as Response;
 }
@@ -27,97 +28,112 @@ function mockErrorResponse(status: number, statusText: string) {
     ok: false,
     status,
     statusText,
+    headers: { get: () => null },
     json: () => Promise.resolve({}),
   } as Response;
 }
 
-// ─── analyzePhoto ────────────────────────────────────────────────────────────
+// ─── generateScript ──────────────────────────────────────────────────────────
 
-describe('analyzePhoto', () => {
-  const base64 = 'aGVsbG8=';
+describe('generateScript', () => {
   const successBody = {
     code: 0,
     message: 'ok',
-    data: { options: [{ name: 'style1', brief: 'b' }] },
+    data: {
+      slang: 'YYDS',
+      origin: 'The Shining',
+      explanation: '永远的神',
+      panel_count: 4,
+      panels: [
+        { scene: 'scene1', dialogue: 'dialogue1' },
+      ],
+    },
   };
 
-  it('sends POST with correct URL, method, Content-Type header, and body fields', async () => {
+  it('sends POST to /api/generate-script with empty body', async () => {
     mockFetch.mockResolvedValue(mockJsonResponse(successBody));
 
-    await analyzePhoto(base64);
+    await generateScript();
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, options] = mockFetch.mock.calls[0];
 
-    expect(url).toBe('/api/analyze');
+    expect(url).toBe('/api/generate-script');
     expect(options.method).toBe('POST');
     expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
 
     const parsed = JSON.parse(options.body);
-    expect(parsed).toEqual({
-      image_base64: base64,
-      image_format: 'jpeg',
-    });
+    expect(parsed).toEqual({});
+  });
+
+  it('returns script data on success', async () => {
+    mockFetch.mockResolvedValue(mockJsonResponse(successBody));
+
+    const result = await generateScript();
+    expect(result.code).toBe(0);
+    expect(result.data.slang).toBe('YYDS');
+    expect(result.data.panels).toHaveLength(1);
   });
 
   it('throws on network error (TypeError) with correct message', async () => {
     mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
-    await expect(analyzePhoto(base64)).rejects.toThrow('网络错误，请检查网络连接');
+    await expect(generateScript()).rejects.toThrow('Network error, please check your connection');
   });
 
   it('throws on business error (code !== 0) with server message', async () => {
-    const bizError = { code: 500, message: '图片格式不支持' };
+    const bizError = { code: 500, message: 'Failed to generate slang' };
     mockFetch.mockResolvedValue(mockJsonResponse(bizError));
 
-    await expect(analyzePhoto(base64)).rejects.toThrow('图片格式不支持');
+    await expect(generateScript()).rejects.toThrow('Failed to generate slang');
   });
 
   it('throws on HTTP error (status 500)', async () => {
     mockFetch.mockResolvedValue(mockErrorResponse(500, 'Internal Server Error'));
 
-    await expect(analyzePhoto(base64)).rejects.toThrow('请求失败 (500)');
+    await expect(generateScript()).rejects.toThrow('Request failed (500)');
   });
 });
 
-// ─── generatePoster ──────────────────────────────────────────────────────────
+// ─── generateComic ───────────────────────────────────────────────────────────
 
-describe('generatePoster', () => {
-  const base64 = 'aGVsbG8=';
-  const styleName = 'cyberpunk';
-  const styleBrief = 'a beautiful poster';
+describe('generateComic', () => {
+  const scriptData = {
+    slang: 'YYDS',
+    origin: 'The Shining',
+    explanation: '永远的神',
+    panel_count: 4,
+    panels: [
+      { scene: 'scene1', dialogue: 'dialogue1' },
+    ],
+  };
   const successBody = {
     code: 0,
     message: 'ok',
-    data: { poster_url: 'url', thumbnail_url: 'thumb', history_id: '1' },
+    data: { comic_url: 'url', thumbnail_url: 'thumb', history_id: '1' },
   };
 
-  it('sends POST with correct body fields (image_base64, image_format, style_name, style_brief)', async () => {
+  it('sends POST to /api/generate-comic with script data', async () => {
     mockFetch.mockResolvedValue(mockJsonResponse(successBody));
 
-    await generatePoster(base64, styleName, styleBrief);
+    await generateComic(scriptData);
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, options] = mockFetch.mock.calls[0];
 
-    expect(url).toBe('/api/generate');
+    expect(url).toBe('/api/generate-comic');
     expect(options.method).toBe('POST');
     expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
 
     const parsed = JSON.parse(options.body);
-    expect(parsed).toEqual({
-      image_base64: base64,
-      image_format: 'jpeg',
-      style_name: styleName,
-      style_brief: styleBrief,
-    });
+    expect(parsed).toEqual(scriptData);
   });
 
   it('throws on network error', async () => {
     mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
-    await expect(generatePoster(base64, styleName, styleBrief)).rejects.toThrow(
-      '网络错误，请检查网络连接',
+    await expect(generateComic(scriptData)).rejects.toThrow(
+      'Network error, please check your connection',
     );
   });
 });
@@ -148,6 +164,6 @@ describe('getHistory', () => {
   it('throws on network error', async () => {
     mockFetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
-    await expect(getHistory(1, 10)).rejects.toThrow('网络错误，请检查网络连接');
+    await expect(getHistory(1, 10)).rejects.toThrow('Network error, please check your connection');
   });
 });

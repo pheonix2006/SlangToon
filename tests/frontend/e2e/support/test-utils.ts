@@ -1,7 +1,7 @@
 import { Page } from '@playwright/test';
 
-export async function mockAnalyzeAPI(page: Page) {
-  await page.route('**/api/analyze', async (route) => {
+export async function mockScriptAPI(page: Page) {
+  await page.route('**/api/generate-script', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -9,10 +9,27 @@ export async function mockAnalyzeAPI(page: Page) {
         code: 0,
         message: 'success',
         data: {
-          options: [
-            { name: '赛博朋克', brief: '霓虹光影', prompt: 'cyberpunk neon city prompt' },
-            { name: '武侠江湖', brief: '水墨刀剑', prompt: 'wuxia sword and ink prompt' },
-            { name: '蒸汽朋克', brief: '齿轮蒸汽', prompt: 'steampunk gears and steam prompt' },
+          slang: 'Break a leg',
+          origin: 'Western theater tradition',
+          explanation: 'Used to wish good luck before a performance, ironically hoping the show is so successful that actors must bow so much their legs break.',
+          panel_count: 4,
+          panels: [
+            {
+              scene: 'A nervous actor paces backstage, clutching a crumpled script. The stage manager glances at the clock.',
+              dialogue: 'Narrator: "It was opening night..."',
+            },
+            {
+              scene: 'Friends gather around the actor, giving thumbs up with warm smiles.',
+              dialogue: 'Friend: "You\'ve got this!"',
+            },
+            {
+              scene: 'The actor steps onto the stage under a bright spotlight. The audience is a sea of silhouettes.',
+              dialogue: '',
+            },
+            {
+              scene: 'Standing ovation! Confetti falls. The actor beams with joy and happy tears.',
+              dialogue: 'Narrator: "Break a leg indeed."',
+            },
           ],
         },
       }),
@@ -20,8 +37,8 @@ export async function mockAnalyzeAPI(page: Page) {
   });
 }
 
-export async function mockGenerateAPI(page: Page) {
-  await page.route('**/api/generate', async (route) => {
+export async function mockComicAPI(page: Page) {
+  await page.route('**/api/generate-comic', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -29,8 +46,8 @@ export async function mockGenerateAPI(page: Page) {
         code: 0,
         message: 'success',
         data: {
-          poster_url: '/data/posters/test-poster.png',
-          thumbnail_url: '/data/posters/test-thumb.png',
+          comic_url: '/data/comics/test-comic.png',
+          thumbnail_url: '/data/comics/test-thumb.png',
           history_id: 'test-id-123',
         },
       }),
@@ -50,11 +67,13 @@ export async function mockHistoryAPI(page: Page) {
           items: [
             {
               id: '1',
-              style_name: '赛博朋克',
-              prompt: 'prompt',
-              poster_url: '/poster1.png',
-              thumbnail_url: '/thumb1.png',
-              photo_url: '/photo1.jpg',
+              slang: 'Break a leg',
+              origin: 'Western theater tradition',
+              explanation: 'Used to wish good luck before a performance.',
+              panel_count: 4,
+              comic_url: '/data/comics/comic1.png',
+              thumbnail_url: '/data/comics/thumb1.png',
+              comic_prompt: 'A 4-panel comic about theater...',
               created_at: '2026-03-29T10:00:00',
             },
           ],
@@ -67,3 +86,29 @@ export async function mockHistoryAPI(page: Page) {
     });
   });
 }
+
+/** Mock data matching the generate-script API response structure. */
+export const mockScriptData = {
+  slang: 'Break a leg',
+  origin: 'Western theater tradition',
+  explanation: 'Used to wish good luck before a performance.',
+  panel_count: 4,
+  panels: [
+    {
+      scene: 'A nervous actor paces backstage, clutching a crumpled script.',
+      dialogue: 'Narrator: "It was opening night..."',
+    },
+    {
+      scene: 'Friends gather around the actor, giving thumbs up.',
+      dialogue: 'Friend: "You\'ve got this!"',
+    },
+    {
+      scene: 'The actor steps onto the stage under a bright spotlight.',
+      dialogue: '',
+    },
+    {
+      scene: 'Standing ovation! Confetti falls.',
+      dialogue: 'Narrator: "Break a leg indeed."',
+    },
+  ],
+};

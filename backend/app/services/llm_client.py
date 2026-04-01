@@ -125,6 +125,79 @@ class LLMClient:
             f"LLM 请求在 {self._max_retries} 次重试后仍然失败"
         ) from last_exc
 
+    async def chat(
+        self,
+        system_prompt: str,
+        user_text: str,
+        temperature: float = 0.8,
+    ) -> str:
+        """Text-only LLM call (no image). Same retry/backoff as chat_with_vision."""
+        url = f"{self._base_url}/chat/completions"
+        logger.info("LLM text请求发送中 (url=%s, model=%s, timeout=%.0fs)", url, self._model, self._timeout)
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_text},
+            ],
+            "max_tokens": self._max_tokens,
+            "temperature": temperature,
+        }
+
+        last_exc: Exception | None = None
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    resp = await client.post(url, json=payload, headers=headers)
+
+                    if resp.status_code >= 500:
+                        last_exc = LLMApiError(
+                            f"LLM API 服务端错误 {resp.status_code}: {resp.text[:500]}"
+                        )
+                        logger.warning(
+                            "LLM text 5xx (attempt %d/%d): %s",
+                            attempt, self._max_retries, repr(last_exc),
+                        )
+                        if attempt < self._max_retries:
+                            await self._backoff(attempt)
+                        continue
+
+                    self._check_status(resp)
+
+                    data = resp.json()
+                    content: str = data["choices"][0]["message"]["content"]
+                    logger.info("LLM text响应成功 (attempt %d/%d)", attempt, self._max_retries)
+                    return content
+
+            except httpx.TimeoutException as exc:
+                last_exc = exc
+                logger.warning(
+                    "LLM text请求超时 (attempt %d/%d): %s",
+                    attempt, self._max_retries, repr(exc),
+                )
+                if attempt < self._max_retries:
+                    await self._backoff(attempt)
+
+            except LLMApiError:
+                raise
+
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "LLM text请求异常 (attempt %d/%d): %s",
+                    attempt, self._max_retries, repr(exc),
+                )
+                if attempt < self._max_retries:
+                    await self._backoff(attempt)
+
+        raise LLMTimeoutError(
+            f"LLM text请求在 {self._max_retries} 次重试后仍然失败"
+        ) from last_exc
+
     # ------------------------------------------------------------------
     # JSON 提取
     # ------------------------------------------------------------------

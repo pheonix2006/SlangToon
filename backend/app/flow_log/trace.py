@@ -30,7 +30,7 @@ class FlowTrace(BaseModel):
 
     trace_id: str = ""
     request_id: str = ""
-    flow_type: Literal["analyze", "generate"] = "analyze"
+    flow_type: Literal["script", "comic"] = "script"
     status: Literal["running", "success", "failed"] = "running"
     created_at: str = ""
     total_duration_ms: float = 0.0

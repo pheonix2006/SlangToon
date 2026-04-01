@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     )
 
     # 应用配置
-    app_name: str = "PoseArtGenerator"
+    app_name: str = "SlangToon"
     app_version: str = "1.0.0"
     debug: bool = False
     host: str = "0.0.0.0"
@@ -32,8 +32,7 @@ class Settings(BaseSettings):
     qwen_image_max_retries: int = 3
 
     # 存储
-    photo_storage_dir: str = "data/photos"
-    poster_storage_dir: str = "data/posters"
+    comic_storage_dir: str = "data/comics"
     history_file: str = "data/history.json"
     max_history_records: int = 1000
 

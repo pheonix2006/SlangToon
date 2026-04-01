@@ -30,7 +30,7 @@ class TestDefaultValues:
         assert s.host == "0.0.0.0"
         assert s.port == 8888
         assert s.debug is False
-        assert s.app_name == "PoseArtGenerator"
+        assert s.app_name == "SlangToon"
         assert s.app_version == "1.0.0"
         assert s.vision_llm_timeout == 90
         assert s.vision_llm_max_retries == 2

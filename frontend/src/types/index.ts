@@ -1,40 +1,52 @@
 export enum AppState {
   CAMERA_READY = 'CAMERA_READY',
-  COUNTDOWN = 'COUNTDOWN',
-  PHOTO_TAKEN = 'PHOTO_TAKEN',
-  ANALYZING = 'ANALYZING',
-  STYLE_SELECTION = 'STYLE_SELECTION',
-  GENERATING = 'GENERATING',
-  POSTER_READY = 'POSTER_READY',
+  SCRIPT_LOADING = 'SCRIPT_LOADING',
+  SCRIPT_PREVIEW = 'SCRIPT_PREVIEW',
+  COMIC_GENERATING = 'COMIC_GENERATING',
+  COMIC_READY = 'COMIC_READY',
   HISTORY = 'HISTORY',
 }
 
 export type GestureType = 'ok' | 'open_palm' | 'none';
 
-export interface StyleOption {
-  name: string;
-  brief: string;
+export interface Panel {
+  scene: string;
+  dialogue: string;
 }
 
-export interface AnalyzeResponse {
-  code: number;
-  message: string;
-  data: { options: StyleOption[] };
+export interface ScriptData {
+  slang: string;
+  origin: string;
+  explanation: string;
+  panel_count: number;
+  panels: Panel[];
 }
 
-export interface GenerateResponse {
+export interface ScriptResponse {
   code: number;
   message: string;
-  data: { poster_url: string; thumbnail_url: string; history_id: string };
+  data: ScriptData;
+}
+
+export interface ComicResponse {
+  code: number;
+  message: string;
+  data: {
+    comic_url: string;
+    thumbnail_url: string;
+    history_id: string;
+  };
 }
 
 export interface HistoryItem {
   id: string;
-  photo_url: string;
-  poster_url: string;
+  slang: string;
+  origin: string;
+  explanation: string;
+  panel_count: number;
+  comic_url: string;
   thumbnail_url: string;
-  style_name: string;
-  prompt: string;
+  comic_prompt: string;
   created_at: string;
 }
 

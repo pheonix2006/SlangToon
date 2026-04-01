@@ -18,12 +18,10 @@ class ErrorResponse(BaseModel):
 
 class ErrorCode:
     BAD_REQUEST = 40001
-    UNSUPPORTED_FORMAT = 40002
-    IMAGE_TOO_LARGE = 40003
-    VISION_LLM_FAILED = 50001
-    VISION_LLM_INVALID = 50002
-    IMAGE_GEN_FAILED = 50003
-    IMAGE_DOWNLOAD_FAILED = 50004
-    INTERNAL_ERROR = 50005
-    COMPOSE_LLM_FAILED = 50006
-    COMPOSE_LLM_INVALID = 50007
+    SCRIPT_LLM_FAILED = 50001       # Script generation LLM call failed
+    SCRIPT_LLM_INVALID = 50002      # Script response JSON parse failed
+    COMIC_LLM_FAILED = 50003        # Comic prompt composition failed
+    COMIC_LLM_INVALID = 50004       # Comic prompt response parse failed
+    IMAGE_GEN_FAILED = 50005        # Qwen Image 2.0 generation failed
+    IMAGE_DOWNLOAD_FAILED = 50006   # Image download from Qwen failed
+    INTERNAL_ERROR = 50007

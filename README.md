@@ -1,120 +1,128 @@
-# MagicPose
+# SlangToon - AI Slang-to-Comic Generator
 
-**AI 驱动的姿态创意海报生成器**
+AI-powered slang-to-comic generator. Trigger via OK hand gesture in front of the camera, and watch GLM-4.6V produce a random English slang with a multi-panel comic script, then Qwen Image 2.0 renders it into a single 16:9 comic strip.
 
-对着镜头摆个造型，AI 自动识别你的姿态，挑选艺术风格，几秒内生成专属创意海报。
-
-## 工作流程
+## Workflow
 
 ```
-摄像头  -->  手势检测  -->  姿态分析（视觉 LLM）  -->  风格选择  -->  海报生成（AI）
-  ^                                                                                            |
-  |                                                                                            v
-MediaPipe Hands                                                              下载 / 分享海报
+Camera -> OK Gesture -> GLM-4.6V (slang + 4-6 panel script) -> User Preview -> Qwen Image 2.0 (comic strip)
 ```
 
-1. **摆造型** - 站在摄像头前，比出手势触发拍照
-2. **AI 分析** - GLM-4.6V 视觉模型分析你的姿态，推荐匹配的艺术风格
-3. **生成海报** - 选择喜欢的风格，Qwen Image 2.0 为你生成创意海报
+1. **Trigger** - Show an OK hand gesture to the camera
+2. **Generate Script** - GLM-4.6V picks a random slang and writes a multi-panel comic script
+3. **Preview** - Review the slang, origin, explanation, and panel descriptions
+4. **Generate Comic** - Confirm to generate a comic strip image via Qwen Image 2.0
+5. **Download** - View and download the result
 
-## 技术栈
+## Tech Stack
 
-| 层级 | 技术 |
-|------|------|
-| 前端 | React 18, TypeScript, Vite, Tailwind CSS |
-| 后端 | FastAPI, Python 3.12 |
-| 手势检测 | MediaPipe Hands |
-| 视觉大模型 | GLM-4.6V（智谱 BigModel） |
-| 图像生成 | Qwen Image 2.0（通义 DashScope） |
-| 包管理 | uv（Python）、npm（前端） |
+| Layer | Tech |
+|-------|------|
+| Frontend | React 19, TypeScript 5.7, Vite 6, Tailwind CSS 4 |
+| Backend | FastAPI, Python 3.12 |
+| Gesture | MediaPipe Hands |
+| LLM | GLM-4.6V ([BigModel](https://open.bigmodel.cn/)) |
+| Image Gen | Qwen Image 2.0 ([DashScope](https://dashscope.aliyuncs.com/)) |
+| Package | [uv](https://docs.astral.sh/uv/) (Python), npm (frontend) |
 
-## 快速开始
+## Quick Start
 
-### 前置要求
+### Prerequisites
 
 - Python 3.12+
 - Node.js 18+
-- [uv](https://docs.astral.sh/uv/) 包管理器
-- API 密钥：[智谱 BigModel](https://open.bigmodel.cn/)（GLM-4.6V）+ [通义 DashScope](https://dashscope.aliyuncs.com/)（Qwen Image 2.0）
+- [uv](https://docs.astral.sh/uv/) package manager
+- API keys: [BigModel](https://open.bigmodel.cn/) (GLM-4.6V) + [DashScope](https://dashscope.aliyuncs.com/) (Qwen Image 2.0)
 
-### 安装
+### Install & Run
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/pheonix2006/MagicPose.git
-cd MagicPose
+# 1. Clone and enter the project
+git clone <repo-url> && cd SlangToon
 
-# 2. 配置环境变量
+# 2. Configure environment variables
 cp .env.example .env
-# 编辑 .env，填入你的 API 密钥
+# Edit .env and fill in your API keys
 
-# 3. 安装后端依赖
+# 3. Install dependencies
 uv sync
-
-# 4. 安装前端依赖
 cd frontend && npm install && cd ..
 
-# 5. 启动项目
+# 4. Start
 python start.py
 ```
 
-启动后前端访问 `http://localhost:5173`，后端 API 运行在 `http://localhost:8888`。
+Frontend: `http://localhost:5173` | Backend API: `http://localhost:8888`
 
-### 一键启动
+You can also run them separately:
 
 ```bash
-python start.py
+# Backend only
+uv run python backend/run.py
+
+# Frontend only
+cd frontend && npm run dev
 ```
 
-该脚本会自动检查依赖、启动后端服务，并启动前端开发服务器。
+## API Endpoints
 
-## 项目结构
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/generate-script` | POST | Generate random slang + 4-6 panel comic script |
+| `/api/generate-comic` | POST | Generate comic image from a confirmed script |
+| `/api/history` | GET | Paginated generation history |
+| `/health` | GET | Health check |
+
+All endpoints return a unified `ApiResponse` envelope:
+
+```json
+{ "code": 0, "message": "success", "data": { ... } }
+```
+
+## Project Structure
 
 ```
-MagicPose/
-├── backend/            # FastAPI 后端
+SlangToon/
+├── backend/                  # FastAPI backend
+│   ├── run.py                # Uvicorn entry point
 │   └── app/
-│       ├── routers/    # API 路由（analyze、generate、history）
-│       ├── services/   # LLM 客户端、图像生成客户端
-│       ├── storage/    # 基于文件的海报存储
-│       └── config.py   # Pydantic 配置
-├── frontend/           # React + TypeScript
+│       ├── main.py           # App factory + lifespan
+│       ├── config.py         # Pydantic Settings (.env)
+│       ├── routers/          # API routes (script, comic, history)
+│       ├── services/         # Business logic (LLM, image gen, history)
+│       ├── schemas/          # Pydantic request/response models
+│       ├── storage/          # File-based comic image storage
+│       └── prompts/          # LLM prompt templates
+├── frontend/                 # React 19 + TypeScript + Vite
 │   └── src/
-│       ├── components/ # CameraView、PosterDisplay、StyleSelection 等
-│       ├── hooks/      # useCamera、useGestureDetector、useMediaPipeHands
-│       ├── services/   # API 客户端
-│       └── utils/      # captureFrame 帧捕获
-├── tests/              # 统一测试目录
-│   ├── backend/        # 单元测试 + 集成测试
-│   ├── frontend/       # 单元测试 + E2E 测试
-│   └── e2e/            # 全栈端到端测试
-├── docs/               # 设计文档与计划
-├── .env.example        # 环境变量模板
-├── pyproject.toml      # Python 项目配置（uv）
-└── start.py            # 统一启动脚本
+│       ├── components/       # CameraView, ScriptPreview, ComicDisplay, etc.
+│       ├── hooks/            # useCamera, useGestureDetector, useMediaPipeHands
+│       ├── services/         # API client
+│       ├── types/            # TypeScript types and AppState enum
+│       └── utils/            # Gesture recognition algorithm
+├── tests/
+│   ├── backend/              # Unit + integration tests
+│   ├── frontend/             # Vitest unit + Playwright E2E
+│   └── e2e/                  # Full-stack E2E
+├── docs/                     # Design documents
+├── .env.example
+├── pyproject.toml
+└── start.py                  # One-click launcher (both frontend & backend)
 ```
 
-## API 接口
-
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/analyze` | POST | 分析姿态照片，推荐艺术风格 |
-| `/api/generate` | POST | 根据姿态 + 风格生成海报 |
-| `/api/history` | GET | 获取生成历史记录 |
-
-## 测试
+## Testing
 
 ```bash
-# 后端单元测试
+# Backend unit tests
 uv run pytest tests/backend/unit/ -v
 
-# 前端单元测试
+# Frontend unit tests
 cd frontend && npx vitest run
 
-# 前端 E2E 测试
+# Frontend E2E tests
 cd frontend && npx playwright test
 
-# 全栈 E2E 测试（需要运行中的后端服务）
+# Full-stack E2E tests
 uv run python tests/e2e/e2e_test.py
 ```
 
