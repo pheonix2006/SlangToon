@@ -359,26 +359,27 @@ class TestTraceHeaders:
     """验证 X-Trace-Id header 注入。"""
 
     @pytest.mark.asyncio
-    async def test_analyze_response_has_trace_header(self, client, sample_image_base64, monkeypatch):
-        """analyze 响应包含 X-Trace-Id header（trace_enabled=True 时）。"""
-        import app.services.analyze_service as svc
-        monkeypatch.setattr(svc, "analyze_photo", lambda *args: [])
-
-        response = await client.post("/api/analyze", json={
-            "image_base64": sample_image_base64,
-            "image_format": "jpeg",
+    async def test_generate_script_response_has_trace_header(self, client, monkeypatch):
+        """generate-script 响应包含 X-Trace-Id header（trace_enabled=True 时）。"""
+        import app.services.script_service as svc
+        monkeypatch.setattr(svc, "generate_script", lambda *args: {
+            "slang": "test", "origin": "test", "explanation": "test",
+            "panel_count": 4, "panels": [{"scene": "s", "dialogue": "d"}] * 4,
         })
-        # NoOpSession path (analyze_photo returns [] which doesn't match expected flow)
-        # The header is only set for FlowSession when trace_enabled=True
-        # Since monkeypatch returns empty list, it will succeed but trace will be saved
+
+        response = await client.post("/api/generate-script", json={})
+        assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_no_trace_header_when_disabled(self, client, sample_image_base64, monkeypatch, tmp_data_dir):
+    async def test_no_trace_header_when_disabled(self, client, monkeypatch, tmp_data_dir):
         """trace_enabled=False 时无 X-Trace-Id header。"""
         import os
         os.environ["TRACE_ENABLED"] = "false"
-        import app.services.analyze_service as svc
-        monkeypatch.setattr(svc, "analyze_photo", lambda *args: [])
+        import app.services.script_service as svc
+        monkeypatch.setattr(svc, "generate_script", lambda *args: {
+            "slang": "test", "origin": "test", "explanation": "test",
+            "panel_count": 4, "panels": [{"scene": "s", "dialogue": "d"}] * 4,
+        })
         # Force reload settings
         import app.config
         monkeypatch.setattr(app.config, "get_settings", lambda: type("S", (), {

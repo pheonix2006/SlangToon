@@ -74,7 +74,7 @@ class TestRequestIdMiddleware:
             scope = {
                 "type": "http",
                 "method": "POST",
-                "path": "/api/analyze",
+                "path": "/api/generate-script",
                 "query_string": b"",
                 "headers": [],
                 "server": ("testserver", 80),
@@ -87,5 +87,5 @@ class TestRequestIdMiddleware:
         asyncio.run(run())
 
         content = log_file.read_text(encoding="utf-8")
-        assert "→ POST /api/analyze" in content
-        assert "← POST /api/analyze" in content
+        assert "→ POST /api/generate-script" in content
+        assert "← POST /api/generate-script" in content
