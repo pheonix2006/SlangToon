@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Environment
+.env
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# User data (runtime generated)
+backend/data/*
+!backend/data/.gitkeep
+
+# Build & Logs
+logs/
+*.log
+.pytest_cache/
+.coverage
+
+# Test artifacts
+frontend/test-results/
+
+# Claude Code
+.claude/
+
+# Superpowers
+.superpowers/
+
+# School coursework
+school/
