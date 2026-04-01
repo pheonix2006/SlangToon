@@ -1,7 +1,7 @@
 # SlangToon — Slang-to-Comic Generator Design
 
 > Date: 2026-04-01
-> Status: Approved
+> Status: Approved (Revised)
 
 ## Overview
 
@@ -50,6 +50,11 @@ CAMERA_READY → SCRIPT_LOADING → SCRIPT_PREVIEW → COMIC_GENERATING → COMI
 
 Full-screen step flow. Each state occupies the full viewport. No split views. Camera only visible in `CAMERA_READY` state (not needed elsewhere since no photo is taken).
 
+### Error Recovery
+
+- `SCRIPT_LOADING` fails → back to `CAMERA_READY` (show error, tap to retry)
+- `COMIC_GENERATING` fails → back to `SCRIPT_PREVIEW` (preserve script data, user can retry)
+
 ---
 
 ## API Design
@@ -58,7 +63,12 @@ Full-screen step flow. Each state occupies the full viewport. No split views. Ca
 
 Generate a random slang with comic script.
 
-**Request**: Empty body `{}`
+**Request**:
+```json
+{}
+```
+
+Uses `ScriptRequest(BaseModel)` with no fields (reserved for future parameters like language preference). `model_config = ConfigDict(extra="forbid")`.
 
 **Response**:
 ```json
@@ -98,11 +108,16 @@ Generate a single comic strip image from the script.
 ```json
 {
   "slang": "Break a leg",
+  "origin": "Western theater tradition",
+  "explanation": "Used to wish good luck before a performance",
+  "panel_count": 4,
   "panels": [
     { "scene": "...", "dialogue": "..." }
   ]
 }
 ```
+
+Includes `origin` and `explanation` for full cultural context when building the image prompt.
 
 **Response**:
 ```json
@@ -117,11 +132,27 @@ Generate a single comic strip image from the script.
 }
 ```
 
-**Image spec**: 16:9 aspect ratio (1024x576), single image with multi-panel comic layout (borders, speech bubbles, panel dividers).
+**Image spec**: 16:9 aspect ratio, size `2688*1536` (Qwen Image 2.0 recommended 16:9 resolution), single image with multi-panel comic layout (borders, speech bubbles, panel dividers). `prompt_extend` parameter set to `false` to preserve exact prompt control.
 
-### `GET /api/history` (unchanged)
+### `GET /api/history`
 
-Paginated history of generated comics. Same pagination structure as existing, field names adapted for comic data.
+Paginated history of generated comics.
+
+**HistoryItem schema**:
+```python
+class HistoryItem(BaseModel):
+    id: str
+    slang: str
+    origin: str
+    explanation: str
+    panel_count: int
+    comic_url: str
+    thumbnail_url: str
+    comic_prompt: str          # The visual prompt sent to Qwen
+    created_at: str
+```
+
+Same pagination structure as existing: `{ items, total, page, page_size, total_pages }`.
 
 ### `GET /health` (unchanged)
 
@@ -133,15 +164,15 @@ Paginated history of generated comics. Same pagination structure as existing, fi
 
 ```
 routers/
-  script.py          → script_service.py → llm_client.py
-  comic.py           → comic_service.py  → llm_client.py + image_gen_client.py
+  script.py          → script_service.py → llm_client.py (text-only call)
+  comic.py           → comic_service.py  → image_gen_client.py (text-to-image)
   history.py         → history_service.py (adapted fields)
 
 services/
-  script_service.py  # Single LLM call: slang + panels
-  comic_service.py   # Build image prompt from panels → Qwen Image 2.0
-  llm_client.py      # REUSED (OpenAI-compatible, fully generic)
-  image_gen_client.py # REUSED (DashScope Qwen Image 2.0)
+  script_service.py  # Single LLM call: slang + panels (text-only, no image)
+  comic_service.py   # Build image prompt from script → Qwen Image 2.0 (text-to-image)
+  llm_client.py      # MODIFY: add chat() method for text-only calls
+  image_gen_client.py # MODIFY: add generate_from_text() for text-to-image
   history_service.py # REUSED (field adaptation)
 
 prompts/
@@ -149,11 +180,43 @@ prompts/
   comic_prompt.py    # New: build visual prompt for multi-panel 16:9 comic
 
 schemas/
-  script.py          # ScriptResponse, Panel, SlangData
+  script.py          # ScriptRequest, ScriptResponse, Panel
   comic.py           # ComicRequest, ComicResponse
-  common.py          # REUSED ApiResponse + new ErrorCodes
-  history.py         # Adapted for comic entries
+  common.py          # MODIFY: new ErrorCodes
+  history.py         # MODIFY: new HistoryItem fields
 ```
+
+### Client Modifications
+
+**LLMClient** (`llm_client.py`):
+- Current `chat_with_vision()` requires `image_base64` and `image_format` — cannot be used for text-only calls.
+- Add new `chat(system_prompt: str, user_text: str, temperature: float = 0.8) -> str` method for text-only LLM calls (no image in messages payload).
+- Existing `chat_with_vision()` stays unchanged for backward compatibility.
+
+**ImageGenClient** (`image_gen_client.py`):
+- Current `generate()` requires `image_base64` — this is image-to-image mode.
+- Add new `generate_from_text(prompt: str, size: str = "2688*1536") -> str` method for text-to-image mode (no image in DashScope payload, `prompt_extend` set to `false`).
+- Existing `generate()` stays unchanged.
+
+### config.py Changes
+
+```python
+# Before (old)
+app_name: str = "PoseArtGenerator"
+poster_storage_dir: str = "data/posters"
+photo_storage_dir: str = "data/photos"
+
+# After (new)
+app_name: str = "SlangToon"
+comic_storage_dir: str = "data/comics"   # renamed from poster_storage_dir
+# photo_storage_dir: REMOVED (no photo capture)
+```
+
+### FileStorage Changes
+
+- Remove `photo_dir` constructor parameter and `save_photo()` method.
+- Rename `poster_dir` parameter to `comic_dir` (or keep generic `storage_dir`).
+- `save_poster()` → `save_comic()` (semantic rename).
 
 ### LLM Prompt Strategy
 
@@ -166,7 +229,13 @@ schemas/
 **Comic Image Prompt** (`comic_prompt.py`):
 - Transforms the script panels into a single visual prompt for Qwen Image 2.0
 - Specifies: 16:9 layout, panel arrangement (e.g., 4-across or 2x2), manga/comic style, speech bubble positions, color palette, character descriptions per panel
-- Output: English prompt string (200-500 words) passed directly to Qwen
+- Output: English prompt string, **max 800 characters** (Qwen Image 2.0 text prompt limit). Must be concise — focus on visual layout and panel descriptions rather than narrative prose.
+
+### Trace Integration
+
+New services integrate with the existing `FlowSession` trace system:
+- `script_service.py`: trace step "script_generation" with LLM call duration and token info
+- `comic_service.py`: trace step "comic_generation" with prompt and Qwen API call duration
 
 ### Error Codes
 
@@ -175,11 +244,21 @@ class ErrorCode:
     BAD_REQUEST = 40001
     SCRIPT_LLM_FAILED = 50001       # Script generation LLM call failed
     SCRIPT_LLM_INVALID = 50002      # Script response JSON parse failed
-    COMIC_LLM_FAILED = 50003        # Comic prompt composition LLM failed
+    COMIC_LLM_FAILED = 50003        # Comic prompt composition failed
     COMIC_LLM_INVALID = 50004       # Comic prompt response parse failed
     IMAGE_GEN_FAILED = 50005        # Qwen Image 2.0 generation failed
     IMAGE_DOWNLOAD_FAILED = 50006   # Image download from Qwen failed
     INTERNAL_ERROR = 50007
+```
+
+### Frontend Timeout Configuration
+
+```typescript
+TIMEOUTS = {
+  SCRIPT_REQUEST: 200_000,   // 200s — LLM text call (no image)
+  COMIC_REQUEST: 400_000,    // 400s — Qwen image generation
+  HISTORY_REQUEST: 10_000,   // 10s — paginated history
+}
 ```
 
 ---
@@ -188,15 +267,28 @@ class ErrorCode:
 
 ### Reuse Without Modification
 
-- `backend/app/main.py` (framework), `config.py`, `dependencies.py`, `middleware.py`, `logging_config.py`
+- `backend/app/main.py` (framework only — routers registered separately)
+- `backend/app/dependencies.py`, `middleware.py`, `logging_config.py`
 - `backend/app/flow_log/` (trace system)
-- `backend/app/storage/file_storage.py` (file storage + thumbnails)
-- `backend/app/services/llm_client.py` (generic OpenAI-compatible client)
-- `backend/app/services/image_gen_client.py` (DashScope Qwen client)
+- `backend/app/services/history_service.py` (CRUD logic unchanged, field names adapted at schema level)
 - `frontend/src/hooks/useCamera.ts`, `useMediaPipeHands.ts`, `useGestureDetector.ts`, `useCountdown.ts`
 - `frontend/src/utils/gestureAlgo.ts`
-- `frontend/src/services/api.ts` (generic request wrapper)
+- `frontend/src/services/api.ts` (generic `request<T>()` wrapper — add new endpoint functions)
 - `frontend/src/components/ErrorDisplay.tsx`, `LoadingSpinner.tsx`
+
+### Modify
+
+- `backend/app/main.py` — register new routers (`script`, `comic`), remove old (`analyze`, `generate`), remove `photo_storage_dir` from lifespan
+- `backend/app/config.py` — rename `app_name` to `"SlangToon"`, `poster_storage_dir` → `comic_storage_dir`, remove `photo_storage_dir`
+- `backend/app/schemas/common.py` — new ErrorCodes
+- `backend/app/schemas/history.py` — new HistoryItem fields (`slang`, `origin`, `explanation`, `panel_count`, `comic_url`, `comic_prompt`; remove `style_name`, `photo_url`)
+- `backend/app/services/llm_client.py` — add `chat()` method for text-only calls
+- `backend/app/services/image_gen_client.py` — add `generate_from_text()` method for text-to-image
+- `backend/app/storage/file_storage.py` — remove `photo_dir`/`save_photo()`, rename poster→comic
+- `frontend/src/types/index.ts` — new AppState enum + interfaces (`ScriptData`, `Panel`, `ComicData`)
+- `frontend/src/constants/index.ts` — new API endpoints + timeout values
+- `frontend/src/App.tsx` — new state machine + component composition
+- `CLAUDE.md` — update project name, structure, API docs, error codes
 
 ### Delete
 
@@ -206,6 +298,8 @@ class ErrorCode:
 - `backend/app/schemas/analyze.py`, `generate.py`
 - `frontend/src/components/StyleSelection/`, `StyleCard/`, `PosterDisplay/`, `GestureOverlay/`, `Countdown/`
 - `frontend/src/utils/captureFrame.ts`
+- `tests/backend/unit/test_analyze.py`, `test_generate.py`, `test_system_prompt.py`, `test_schemas_common.py`
+- Frontend tests for deleted components
 
 ### New Files
 
@@ -217,36 +311,30 @@ class ErrorCode:
 - `frontend/src/components/ComicDisplay/ComicDisplay.tsx`
 - `frontend/src/components/HistoryList/HistoryList.tsx` (rewrite)
 
-### Modify
-
-- `backend/app/main.py` — register new routers, remove old
-- `backend/app/config.py` — clean up unused fields
-- `backend/app/schemas/common.py` — new ErrorCodes
-- `frontend/src/types/index.ts` — new AppState enum + interfaces
-- `frontend/src/constants/index.ts` — new API endpoints
-- `frontend/src/App.tsx` — new state machine + component composition
-
 ---
 
 ## Testing Strategy
 
 ### Reuse
 
-- `tests/backend/conftest.py` fixtures (`client`, `tmp_data_dir`, `sample_image_base64` — latter no longer needed)
+- `tests/backend/conftest.py` fixtures (`client`, `tmp_data_dir`)
+- Remove `sample_image_base64` and `mock_image_gen_b64` fixtures (no photo capture, no image-to-image)
+- Add new fixtures: `mock_script_response` (mock LLM JSON), `mock_comic_prompt` (mock prompt string)
 - Test infrastructure patterns (pytest-asyncio, mock patterns)
 
 ### Delete
 
-- `tests/backend/unit/test_analyze.py`, `test_generate.py`, `test_system_prompt.py`
-- `tests/backend/unit/test_schemas_common.py` (old schemas)
+- `tests/backend/unit/test_analyze.py`, `test_generate.py`, `test_system_prompt.py`, `test_schemas_common.py`
 - Frontend tests for deleted components
 
 ### New Tests
 
-- `tests/backend/unit/test_script_service.py` — LLM call, JSON parsing, panel_count validation
-- `tests/backend/unit/test_comic_service.py` — prompt assembly, Qwen API call, image handling
+- `tests/backend/unit/test_script_service.py` — text-only LLM call, JSON parsing, panel_count validation (4-6 range)
+- `tests/backend/unit/test_comic_service.py` — prompt assembly, Qwen text-to-image call, prompt length ≤ 800 chars
 - `tests/backend/unit/test_script.py` — router integration test (`/api/generate-script`)
 - `tests/backend/unit/test_comic.py` — router integration test (`/api/generate-comic`)
+- `tests/backend/unit/test_llm_client.py` — extend existing: test new `chat()` method
+- `tests/backend/unit/test_image_gen_client.py` — extend existing: test new `generate_from_text()` method
 - Frontend unit tests for `ScriptPreview`, `ComicDisplay`, `HistoryList`
 
 ---
