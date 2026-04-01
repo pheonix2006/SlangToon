@@ -68,9 +68,10 @@ async def test_history_with_data(client, tmp_data_dir):
     import json
     history_file = tmp_data_dir / "history.json"
     records = [
-        {"id": f"id-{i}", "style_name": f"style-{i}", "prompt": f"prompt-{i}",
-         "poster_url": f"/poster-{i}.png", "thumbnail_url": f"/thumb-{i}.png",
-         "photo_url": f"/photo-{i}.jpg", "created_at": f"2026-03-{29 - i:02d}T12:00:00+00:00"}
+        {"id": f"id-{i}", "slang": f"slang-{i}", "origin": "Western",
+         "explanation": f"explain-{i}", "panel_count": 4,
+         "comic_url": f"/comic-{i}.png", "thumbnail_url": f"/thumb-{i}.png",
+         "comic_prompt": f"prompt-{i}", "created_at": f"2026-03-{29 - i:02d}T12:00:00+00:00"}
         for i in range(5)
     ]
     history_file.write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
@@ -88,12 +89,14 @@ async def test_history_order_descending(client, tmp_data_dir):
     import json
     history_file = tmp_data_dir / "history.json"
     records = [
-        {"id": "first", "style_name": "old", "prompt": "p1",
-         "poster_url": "/p1.png", "thumbnail_url": "/t1.png",
-         "photo_url": "/ph1.jpg", "created_at": "2026-03-28T10:00:00+00:00"},
-        {"id": "second", "style_name": "new", "prompt": "p2",
-         "poster_url": "/p2.png", "thumbnail_url": "/t2.png",
-         "photo_url": "/ph2.jpg", "created_at": "2026-03-29T10:00:00+00:00"},
+        {"id": "first", "slang": "old-slang", "origin": "Western",
+         "explanation": "old explain", "panel_count": 4,
+         "comic_url": "/c1.png", "thumbnail_url": "/t1.png",
+         "comic_prompt": "p1", "created_at": "2026-03-28T10:00:00+00:00"},
+        {"id": "second", "slang": "new-slang", "origin": "Eastern",
+         "explanation": "new explain", "panel_count": 5,
+         "comic_url": "/c2.png", "thumbnail_url": "/t2.png",
+         "comic_prompt": "p2", "created_at": "2026-03-29T10:00:00+00:00"},
     ]
     history_file.write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
 
@@ -117,20 +120,20 @@ async def test_history_record_fields_complete(client, tmp_data_dir):
     import json
     history_file = tmp_data_dir / "history.json"
     record = {
-        "id": "test-id", "style_name": "cyberpunk", "prompt": "neon lights",
-        "poster_url": "/poster.png", "thumbnail_url": "/thumb.png",
-        "photo_url": "/photo.jpg", "created_at": "2026-03-29T12:00:00+00:00",
+        "id": "test-id", "slang": "Break a leg", "origin": "Western",
+        "explanation": "Good luck wish", "panel_count": 4,
+        "comic_url": "/comic.png", "thumbnail_url": "/thumb.png",
+        "comic_prompt": "neon lights", "created_at": "2026-03-29T12:00:00+00:00",
     }
     history_file.write_text(json.dumps([record], ensure_ascii=False), encoding="utf-8")
 
     resp = await client.get("/api/history")
     item = resp.json()["data"]["items"][0]
     assert item["id"] == "test-id"
-    assert item["style_name"] == "cyberpunk"
-    assert item["prompt"] == "neon lights"
-    assert item["poster_url"] == "/poster.png"
+    assert item["slang"] == "Break a leg"
+    assert item["comic_prompt"] == "neon lights"
+    assert item["comic_url"] == "/comic.png"
     assert item["thumbnail_url"] == "/thumb.png"
-    assert item["photo_url"] == "/photo.jpg"
     assert item["created_at"] == "2026-03-29T12:00:00+00:00"
 
 
@@ -140,9 +143,10 @@ async def test_history_page_size_one(client, tmp_data_dir):
     import json
     history_file = tmp_data_dir / "history.json"
     records = [
-        {"id": f"id-{i}", "style_name": f"s{i}", "prompt": f"p{i}",
-         "poster_url": f"/p{i}.png", "thumbnail_url": f"/t{i}.png",
-         "photo_url": f"/ph{i}.jpg", "created_at": "2026-03-29T12:00:00+00:00"}
+        {"id": f"id-{i}", "slang": f"s{i}", "origin": "Western",
+         "explanation": f"exp-{i}", "panel_count": 4,
+         "comic_url": f"/c{i}.png", "thumbnail_url": f"/t{i}.png",
+         "comic_prompt": f"p{i}", "created_at": "2026-03-29T12:00:00+00:00"}
         for i in range(3)
     ]
     history_file.write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")

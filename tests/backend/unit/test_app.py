@@ -19,16 +19,13 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def env_vars(tmp_path, monkeypatch):
     """设置环境变量和临时目录，使 create_app() / 模块级 app 能正常初始化。"""
-    photo_dir = tmp_path / "photos"
-    poster_dir = tmp_path / "posters"
+    comic_dir = tmp_path / "comics"
     history_file = tmp_path / "history.json"
 
-    photo_dir.mkdir()
-    poster_dir.mkdir()
+    comic_dir.mkdir()
     history_file.write_text("[]", encoding="utf-8")
 
-    monkeypatch.setenv("PHOTO_STORAGE_DIR", str(photo_dir))
-    monkeypatch.setenv("POSTER_STORAGE_DIR", str(poster_dir))
+    monkeypatch.setenv("COMIC_STORAGE_DIR", str(comic_dir))
     monkeypatch.setenv("HISTORY_FILE", str(history_file))
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-placeholder")
     monkeypatch.setenv("LOG_LEVEL", "INFO")
@@ -87,7 +84,7 @@ class TestHealthEndpoint:
         resp = client.get("/health")
         assert resp.status_code == 200
         data = resp.json()
-        assert data == {"status": "ok", "app": "PoseArtGenerator"}
+        assert data == {"status": "ok", "app": "SlangToon"}
 
 
 # ---------------------------------------------------------------------------
@@ -100,8 +97,8 @@ class TestRoutersRegistered:
 
     def test_routers_registered(self, module_app) -> None:
         routes = [route.path for route in module_app.routes]
-        assert "/api/analyze" in routes
-        assert "/api/generate" in routes
+        assert "/api/generate-script" in routes
+        assert "/api/generate-comic" in routes
         assert "/api/history" in routes
         assert "/health" in routes
 
