@@ -268,3 +268,135 @@ class TestRetryLogic:
 
         assert result == "ok"
         assert call_count == 3
+
+
+# ---------------------------------------------------------------------------
+# chat — text-only call
+# ---------------------------------------------------------------------------
+
+class TestChatTextOnly:
+    """Test the text-only chat() method (no image)."""
+
+    def _fake_response(self, content: str, status: int = 200) -> httpx.Response:
+        body = json.dumps({
+            "choices": [{"message": {"content": content}}],
+        })
+        return httpx.Response(
+            status_code=status,
+            content=body.encode(),
+            request=httpx.Request("POST", "https://example.com"),
+        )
+
+    @pytest.mark.asyncio
+    async def test_successful_text_call(self) -> None:
+        """chat() should send messages without image_url."""
+        settings = _make_settings()
+        client = LLMClient(settings)
+
+        expected_content = '{"test": true}'
+        fake_resp = self._fake_response(expected_content)
+
+        async def mock_post(*args, **kwargs):
+            return fake_resp
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            result = await client.chat(
+                system_prompt="You are a comic writer.",
+                user_text="Generate a slang comic script.",
+            )
+
+        assert result == expected_content
+
+    @pytest.mark.asyncio
+    async def test_text_only_payload_structure(self) -> None:
+        """Verify chat() sends text-only content (string, not list)."""
+        settings = _make_settings()
+        client = LLMClient(settings)
+
+        captured: dict = {}
+
+        async def mock_post(self_client, url, json=None, headers=None):
+            captured["json"] = json
+            return self._fake_response("ok")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            await client.chat(
+                system_prompt="sys",
+                user_text="hello",
+            )
+
+        payload = captured["json"]
+        assert payload["model"] == "test-model"
+        user_content = payload["messages"][1]["content"]
+        # Text-only: content should be a string, not a list
+        assert isinstance(user_content, str)
+        assert user_content == "hello"
+
+    @pytest.mark.asyncio
+    async def test_text_retries_on_5xx(self) -> None:
+        """chat() should retry on 5xx errors."""
+        settings = _make_settings(vision_llm_max_retries=3)
+        client = LLMClient(settings)
+        call_count = 0
+
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                return httpx.Response(
+                    status_code=500,
+                    content=b"server error",
+                    request=httpx.Request("POST", "https://example.com"),
+                )
+            return self._fake_response("ok")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            result = await client.chat(system_prompt="sys", user_text="hello")
+
+        assert result == "ok"
+        assert call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_text_4xx_no_retry(self) -> None:
+        """chat() should NOT retry on 4xx errors."""
+        settings = _make_settings(vision_llm_max_retries=3)
+        client = LLMClient(settings)
+        call_count = 0
+
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            return httpx.Response(
+                status_code=400,
+                content=b'{"error": "bad"}',
+                request=httpx.Request("POST", "https://example.com"),
+            )
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            with pytest.raises(LLMApiError):
+                await client.chat(system_prompt="s", user_text="u")
+
+        assert call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_text_timeout_raises(self) -> None:
+        """chat() should retry on timeout and raise LLMTimeoutError."""
+        settings = _make_settings(vision_llm_max_retries=2, vision_llm_timeout=1)
+        client = LLMClient(settings)
+        call_count = 0
+
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            raise httpx.ReadTimeout("timeout")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            with pytest.raises(LLMTimeoutError):
+                await client.chat(system_prompt="s", user_text="u")
+
+        assert call_count == 2
