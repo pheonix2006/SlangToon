@@ -1,4 +1,4 @@
-import type { AnalyzeResponse, GenerateResponse, HistoryResponse } from '../types';
+import type { ScriptResponse, ComicResponse, HistoryResponse } from '../types';
 import { API_BASE_URL, API_ENDPOINTS, TIMEOUTS } from '../constants';
 
 class ApiError extends Error {
@@ -45,7 +45,6 @@ async function request<T>(
       signal: AbortSignal.timeout(timeoutMs),
     });
 
-    // 提取 trace header（在 json() 之前）
     const traceId = response.headers.get('x-trace-id');
     console.log(
       '[FlowTrace] API response:',
@@ -76,7 +75,7 @@ async function request<T>(
     ) {
       const msg = 'message' in data
         ? String((data as { message: unknown }).message)
-        : '服务器返回错误';
+        : 'Server error';
       throw new ApiError(msg, response.status, msg);
     }
 
@@ -86,36 +85,35 @@ async function request<T>(
   }
 }
 
-export async function analyzePhoto(photoBase64: string): Promise<AnalyzeResponse> {
-  return request<AnalyzeResponse>(
-    API_ENDPOINTS.ANALYZE,
+export async function generateScript(): Promise<ScriptResponse> {
+  return request<ScriptResponse>(
+    API_ENDPOINTS.GENERATE_SCRIPT,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_base64: photoBase64, image_format: 'jpeg' }),
+      body: JSON.stringify({}),
     },
-    TIMEOUTS.ANALYZE_REQUEST,
+    TIMEOUTS.SCRIPT_REQUEST,
   );
 }
 
-export async function generatePoster(
-  photoBase64: string,
-  styleName: string,
-  styleBrief: string,
-): Promise<GenerateResponse> {
-  return request<GenerateResponse>(
-    API_ENDPOINTS.GENERATE,
+export async function generateComic(
+  scriptData: {
+    slang: string;
+    origin: string;
+    explanation: string;
+    panel_count: number;
+    panels: { scene: string; dialogue: string }[];
+  },
+): Promise<ComicResponse> {
+  return request<ComicResponse>(
+    API_ENDPOINTS.GENERATE_COMIC,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image_base64: photoBase64,
-        image_format: 'jpeg',
-        style_name: styleName,
-        style_brief: styleBrief,
-      }),
+      body: JSON.stringify(scriptData),
     },
-    TIMEOUTS.GENERATE_REQUEST,
+    TIMEOUTS.COMIC_REQUEST,
   );
 }
 
