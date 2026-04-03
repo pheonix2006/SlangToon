@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass
 
 import httpx
 
@@ -27,6 +28,30 @@ class LLMApiError(Exception):
 
 class LLMResponseError(Exception):
     """LLM 返回内容无法解析或格式异常。"""
+
+
+# ---------------------------------------------------------------------------
+# 响应数据类
+# ---------------------------------------------------------------------------
+
+@dataclass
+class LLMResponse:
+    """LLM response with content and usage metadata."""
+
+    content: str
+    model: str
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    finish_reason: str | None = None
+
+    @property
+    def usage(self) -> dict:
+        return {
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_tokens": self.total_tokens,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +80,7 @@ class LLMClient:
         image_format: str,
         user_text: str,
         temperature: float = 0.8,
-    ) -> str:
+    ) -> LLMResponse:
         """向 Vision LLM 发送图文请求并返回文本内容。
 
         超时 / 5xx 自动重试（指数退避），4xx 不重试直接抛出。
@@ -84,8 +109,8 @@ class LLMClient:
                         last_exc = LLMApiError(
                             f"LLM API 服务端错误 {resp.status_code}: {resp.text[:500]}"
                         )
-                        logger.warning(
-                            "LLM 5xx (attempt %d/%d): %s",
+                        logger.debug(
+                            "Vision 请求 5xx (第 %d/%d 次): %s",
                             attempt, self._max_retries, repr(last_exc),
                         )
                         if attempt < self._max_retries:
@@ -96,14 +121,22 @@ class LLMClient:
 
                     data = resp.json()
                     content: str = data["choices"][0]["message"]["content"]
-                    logger.info("LLM 响应成功 (attempt %d/%d)", attempt, self._max_retries)
-                    return content
+                    logger.info("Vision 响应成功 (第 %d/%d 次)", attempt, self._max_retries)
+                    usage = data.get("usage", {})
+                    return LLMResponse(
+                        content=content,
+                        model=self._model,
+                        prompt_tokens=usage.get("prompt_tokens", 0),
+                        completion_tokens=usage.get("completion_tokens", 0),
+                        total_tokens=usage.get("total_tokens", 0),
+                        finish_reason=data.get("choices", [{}])[0].get("finish_reason"),
+                    )
 
             except httpx.TimeoutException as exc:
                 last_exc = exc
                 detail = repr(exc) if str(exc) else f"{type(exc).__name__}(timeout={self._timeout}s)"
-                logger.warning(
-                    "LLM 请求超时 (attempt %d/%d): %s",
+                logger.debug(
+                    "Vision 请求超时 (第 %d/%d 次): %s",
                     attempt, self._max_retries, detail,
                 )
                 if attempt < self._max_retries:
@@ -114,15 +147,15 @@ class LLMClient:
                 raise
             except Exception as exc:
                 last_exc = exc
-                logger.warning(
-                    "LLM 请求异常 (attempt %d/%d): %s",
+                logger.debug(
+                    "Vision 请求异常 (第 %d/%d 次): %s",
                     attempt, self._max_retries, repr(exc),
                 )
                 if attempt < self._max_retries:
                     await self._backoff(attempt)
 
         raise LLMTimeoutError(
-            f"LLM 请求在 {self._max_retries} 次重试后仍然失败"
+            f"Vision 请求在 {self._max_retries} 次重试后仍然失败"
         ) from last_exc
 
     async def chat(
@@ -130,10 +163,10 @@ class LLMClient:
         system_prompt: str,
         user_text: str,
         temperature: float = 0.8,
-    ) -> str:
+    ) -> LLMResponse:
         """Text-only LLM call (no image). Same retry/backoff as chat_with_vision."""
         url = f"{self._base_url}/chat/completions"
-        logger.info("LLM text请求发送中 (url=%s, model=%s, timeout=%.0fs)", url, self._model, self._timeout)
+        logger.info("文本请求发送中 (url=%s, model=%s, timeout=%.0fs)", url, self._model, self._timeout)
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
@@ -158,8 +191,8 @@ class LLMClient:
                         last_exc = LLMApiError(
                             f"LLM API 服务端错误 {resp.status_code}: {resp.text[:500]}"
                         )
-                        logger.warning(
-                            "LLM text 5xx (attempt %d/%d): %s",
+                        logger.debug(
+                            "文本请求 5xx (第 %d/%d 次): %s",
                             attempt, self._max_retries, repr(last_exc),
                         )
                         if attempt < self._max_retries:
@@ -170,13 +203,21 @@ class LLMClient:
 
                     data = resp.json()
                     content: str = data["choices"][0]["message"]["content"]
-                    logger.info("LLM text响应成功 (attempt %d/%d)", attempt, self._max_retries)
-                    return content
+                    logger.info("文本响应成功 (第 %d/%d 次)", attempt, self._max_retries)
+                    usage = data.get("usage", {})
+                    return LLMResponse(
+                        content=content,
+                        model=self._model,
+                        prompt_tokens=usage.get("prompt_tokens", 0),
+                        completion_tokens=usage.get("completion_tokens", 0),
+                        total_tokens=usage.get("total_tokens", 0),
+                        finish_reason=data.get("choices", [{}])[0].get("finish_reason"),
+                    )
 
             except httpx.TimeoutException as exc:
                 last_exc = exc
-                logger.warning(
-                    "LLM text请求超时 (attempt %d/%d): %s",
+                logger.debug(
+                    "文本请求超时 (第 %d/%d 次): %s",
                     attempt, self._max_retries, repr(exc),
                 )
                 if attempt < self._max_retries:
@@ -187,15 +228,15 @@ class LLMClient:
 
             except Exception as exc:
                 last_exc = exc
-                logger.warning(
-                    "LLM text请求异常 (attempt %d/%d): %s",
+                logger.debug(
+                    "文本请求异常 (第 %d/%d 次): %s",
                     attempt, self._max_retries, repr(exc),
                 )
                 if attempt < self._max_retries:
                     await self._backoff(attempt)
 
         raise LLMTimeoutError(
-            f"LLM text请求在 {self._max_retries} 次重试后仍然失败"
+            f"文本请求在 {self._max_retries} 次重试后仍然失败"
         ) from last_exc
 
     # ------------------------------------------------------------------

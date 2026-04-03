@@ -11,6 +11,7 @@ dependencies = [
     "pydantic-settings>=2.2.0",
     "Pillow>=10.2.0",
     "python-multipart>=0.0.9",
+    "langsmith>=0.1.0",
 ]
 
 [dependency-groups]
@@ -21,3 +22,6 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests/backend"]
+markers = [
+    "integration: marks tests as integration (deselect with '-m \"not integration\"')",
+]

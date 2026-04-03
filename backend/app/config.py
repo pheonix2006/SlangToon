@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     trace_dir: str = "data/traces"
     trace_retention_days: int = 7
 
+    # LangSmith (optional LLM observability)
+    langsmith_enabled: bool = False
+    langsmith_api_key: str = ""
+    langsmith_project: str = "slangtoon"
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]

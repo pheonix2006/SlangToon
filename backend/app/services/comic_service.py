@@ -8,12 +8,15 @@ from app.config import Settings
 from app.prompts.comic_prompt import build_comic_prompt
 from app.services.image_gen_client import ImageGenClient
 from app.storage.file_storage import FileStorage
+from app.tracing.decorators import traceable_node
+from app.tracing.models import NodeType
 
 logger = logging.getLogger(__name__)
 
 COMIC_SIZE = "2688*1536"
 
 
+@traceable_node("generate_comic", node_type=NodeType.CUSTOM)
 async def generate_comic(script_data: dict, settings: Settings) -> dict:
     """Generate a comic strip image from script data.
 
@@ -27,7 +30,7 @@ async def generate_comic(script_data: dict, settings: Settings) -> dict:
     Raises:
         ImageGenApiError, ImageGenTimeoutError on failure.
     """
-    # Build visual prompt
+    # Stage 1: Build visual prompt
     prompt = build_comic_prompt(
         slang=script_data["slang"],
         origin=script_data["origin"],
@@ -36,21 +39,21 @@ async def generate_comic(script_data: dict, settings: Settings) -> dict:
     )
 
     logger.info(
-        "Generating comic for slang='%s' (prompt=%d chars)",
+        "漫画生成中: slang='%s' (prompt=%d 字符)",
         script_data["slang"], len(prompt),
     )
 
-    # Generate image via Qwen Image 2.0 (text-to-image)
+    # Stage 2: Generate image via Qwen Image 2.0 (text-to-image)
     img_client = ImageGenClient(settings)
     image_base64 = await img_client.generate_from_text(prompt=prompt, size=COMIC_SIZE)
 
-    # Save to disk
+    # Stage 3: Save to disk
     history_id = uuid.uuid4().hex
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     storage = FileStorage(settings.comic_storage_dir)
     urls = storage.save_comic(image_base64, history_id, date_str)
 
-    logger.info("Comic saved: history_id=%s, url=%s", history_id, urls["comic_url"])
+    logger.info("漫画已保存: history_id=%s, url=%s", history_id, urls["comic_url"])
 
     # Save to history
     from app.services.history_service import HistoryService

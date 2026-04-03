@@ -2,7 +2,7 @@ import json
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from app.services.llm_client import LLMClient, LLMTimeoutError, LLMApiError
+from app.services.llm_client import LLMClient, LLMResponse, LLMTimeoutError, LLMApiError
 from app.services.script_service import generate_script
 
 
@@ -26,7 +26,7 @@ class TestGenerateScript:
         settings = _make_settings()
 
         with patch.object(LLMClient, "__init__", return_value=None), \
-             patch.object(LLMClient, "chat", new_callable=AsyncMock, return_value=json.dumps(mock_script_data)) as mock_chat:
+             patch.object(LLMClient, "chat", new_callable=AsyncMock, return_value=LLMResponse(content=json.dumps(mock_script_data), model="test-model")) as mock_chat:
             result = await generate_script(settings)
 
         assert result["slang"] == "Break a leg"
@@ -59,7 +59,7 @@ class TestGenerateScript:
         bad_data = {**mock_script_data, "panel_count": 3}
 
         with patch.object(LLMClient, "__init__", return_value=None), \
-             patch.object(LLMClient, "chat", new_callable=AsyncMock, return_value=json.dumps(bad_data)):
+             patch.object(LLMClient, "chat", new_callable=AsyncMock, return_value=LLMResponse(content=json.dumps(bad_data), model="test-model")):
             with pytest.raises(ValueError, match="panel_count"):
                 await generate_script(settings)
 
@@ -70,6 +70,6 @@ class TestGenerateScript:
         bad_data = {**mock_script_data, "panel_count": 4, "panels": mock_script_data["panels"][:3]}
 
         with patch.object(LLMClient, "__init__", return_value=None), \
-             patch.object(LLMClient, "chat", new_callable=AsyncMock, return_value=json.dumps(bad_data)):
+             patch.object(LLMClient, "chat", new_callable=AsyncMock, return_value=LLMResponse(content=json.dumps(bad_data), model="test-model")):
             with pytest.raises(ValueError, match="panels length"):
                 await generate_script(settings)

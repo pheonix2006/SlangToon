@@ -12,6 +12,7 @@ from app.config import Settings
 from app.services.llm_client import (
     LLMClient,
     LLMApiError,
+    LLMResponse,
     LLMResponseError,
     LLMTimeoutError,
 )
@@ -76,7 +77,8 @@ class TestChatWithVision:
 
     def _fake_response(self, content: str, status: int = 200) -> httpx.Response:
         body = json.dumps({
-            "choices": [{"message": {"content": content}}],
+            "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
         })
         resp = httpx.Response(
             status_code=status,
@@ -105,7 +107,13 @@ class TestChatWithVision:
                 user_text="Describe this.",
             )
 
-        assert result == expected_content
+        assert isinstance(result, LLMResponse)
+        assert result.content == expected_content
+        assert result.model == "test-model"
+        assert result.prompt_tokens == 10
+        assert result.completion_tokens == 20
+        assert result.total_tokens == 30
+        assert result.finish_reason == "stop"
 
     @pytest.mark.asyncio
     async def test_request_payload_structure(self) -> None:
@@ -250,7 +258,10 @@ class TestRetryLogic:
                 )
                 return resp
             # 第三次成功
-            body = json.dumps({"choices": [{"message": {"content": "ok"}}]})
+            body = json.dumps({
+                "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 5, "total_tokens": 10},
+            })
             return httpx.Response(
                 status_code=200,
                 content=body.encode(),
@@ -266,7 +277,8 @@ class TestRetryLogic:
                 user_text="u",
             )
 
-        assert result == "ok"
+        assert isinstance(result, LLMResponse)
+        assert result.content == "ok"
         assert call_count == 3
 
 
@@ -279,7 +291,8 @@ class TestChatTextOnly:
 
     def _fake_response(self, content: str, status: int = 200) -> httpx.Response:
         body = json.dumps({
-            "choices": [{"message": {"content": content}}],
+            "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
         })
         return httpx.Response(
             status_code=status,
@@ -306,7 +319,13 @@ class TestChatTextOnly:
                 user_text="Generate a slang comic script.",
             )
 
-        assert result == expected_content
+        assert isinstance(result, LLMResponse)
+        assert result.content == expected_content
+        assert result.model == "test-model"
+        assert result.prompt_tokens == 10
+        assert result.completion_tokens == 20
+        assert result.total_tokens == 30
+        assert result.finish_reason == "stop"
 
     @pytest.mark.asyncio
     async def test_text_only_payload_structure(self) -> None:
@@ -356,7 +375,8 @@ class TestChatTextOnly:
             mp.setattr(httpx.AsyncClient, "post", mock_post)
             result = await client.chat(system_prompt="sys", user_text="hello")
 
-        assert result == "ok"
+        assert isinstance(result, LLMResponse)
+        assert result.content == "ok"
         assert call_count == 3
 
     @pytest.mark.asyncio
@@ -400,3 +420,53 @@ class TestChatTextOnly:
                 await client.chat(system_prompt="s", user_text="u")
 
         assert call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# LLMResponse dataclass
+# ---------------------------------------------------------------------------
+
+class TestLLMResponse:
+    """Test the LLMResponse dataclass."""
+
+    def test_basic_fields(self) -> None:
+        resp = LLMResponse(
+            content="hello",
+            model="test-model",
+            prompt_tokens=10,
+            completion_tokens=20,
+            total_tokens=30,
+            finish_reason="stop",
+        )
+        assert resp.content == "hello"
+        assert resp.model == "test-model"
+        assert resp.prompt_tokens == 10
+        assert resp.completion_tokens == 20
+        assert resp.total_tokens == 30
+        assert resp.finish_reason == "stop"
+
+    def test_usage_property(self) -> None:
+        resp = LLMResponse(
+            content="hello",
+            model="test-model",
+            prompt_tokens=10,
+            completion_tokens=20,
+            total_tokens=30,
+        )
+        assert resp.usage == {
+            "prompt_tokens": 10,
+            "completion_tokens": 20,
+            "total_tokens": 30,
+        }
+
+    def test_defaults(self) -> None:
+        resp = LLMResponse(content="hello", model="test-model")
+        assert resp.prompt_tokens == 0
+        assert resp.completion_tokens == 0
+        assert resp.total_tokens == 0
+        assert resp.finish_reason is None
+        assert resp.usage == {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
