@@ -4,6 +4,8 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
+from langsmith import traceable
+
 from app.graphs.trace_models import TraceRecord, NodeRecord
 from app.graphs.trace_store import TraceStore
 
@@ -32,6 +34,7 @@ def _sanitize(output: dict) -> dict:
     return sanitized
 
 
+@traceable(run_type="chain", name="slangtoon_graph")
 async def invoke_with_trace(
     graph,
     inputs: dict,
@@ -41,12 +44,23 @@ async def invoke_with_trace(
 ) -> tuple[dict, str | None]:
     """Execute graph and collect per-node I/O via astream updates.
 
+    Wrapped with @traceable so that @traceable calls inside nodes (LLMClient,
+    ImageGenClient) become children of this root run in LangSmith.
+
     Returns: (final_state_dict, trace_id)
     Raises: GraphExecutionError on failure (wraps original error with trace_id).
     """
     trace_id = f"t-{uuid.uuid4().hex[:12]}" if settings.trace_enabled else None
     records = []
-    config = {"configurable": {"settings": settings}}
+    config = {
+        "configurable": {"settings": settings},
+        "run_name": f"{flow_type}_flow",
+        "metadata": {
+            "trace_id": trace_id,
+            "flow_type": flow_type,
+            "request_id": request_id,
+        },
+    }
 
     final_state = dict(inputs)
     try:

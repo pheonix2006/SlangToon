@@ -21,7 +21,7 @@ import time
 
 import httpx
 
-API_BASE = "http://localhost:8888"
+API_BASE = "http://localhost:8889"
 TIMEOUT_SCRIPT = 180  # LLM script generation may be slow
 TIMEOUT_COMIC = 300   # Image gen can be very slow
 

@@ -8,13 +8,14 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
+    port: 5174,
     proxy: {
       '/api': {
-        target: 'http://localhost:8888',
+        target: 'http://localhost:8889',
         changeOrigin: true,
       },
       '/data': {
-        target: 'http://localhost:8888',
+        target: 'http://localhost:8889',
         changeOrigin: true,
       },
     },

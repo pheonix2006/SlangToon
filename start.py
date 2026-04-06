@@ -14,6 +14,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+if sys.platform == "win32":
+    import ctypes
+
 # 在启动任何子进程之前，将 .env 加载到 os.environ。
 # 确保 LANGSMITH_TRACING / LANGSMITH_API_KEY / LANGSMITH_PROJECT
 # 在 uvicorn 子工作进程中可见（@traceable 装饰器从 os.environ 读取）。
@@ -27,14 +30,128 @@ BACKEND_DIR = PROJECT_ROOT / "backend"
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
 LOG_DIR = PROJECT_ROOT / "logs"
 
-BACKEND_URL = "http://localhost:8888"
-FRONTEND_URL = "http://localhost:5173"
+BACKEND_URL = "http://localhost:8889"
+FRONTEND_URL = "http://localhost:5174"
 
 processes: list[subprocess.Popen] = []
+
+BACKEND_PORT = 8889
+FRONTEND_PORT = 5174
+
+
+def kill_process_tree(pid: int) -> bool:
+    """Kill a process and its entire process tree (Windows only)."""
+    if sys.platform == "win32":
+        # Use taskkill /T to kill the process tree, /F for force
+        result = subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0
+    else:
+        try:
+            os.killpg(pid, signal.SIGKILL)
+            return True
+        except (ProcessLookupError, PermissionError):
+            return False
+
+
+def find_pids_on_port(port: int) -> list[int]:
+    """Find all PIDs listening on the given port."""
+    pids = []
+    if sys.platform == "win32":
+        result = subprocess.run(
+            ["netstat", "-ano"],
+            capture_output=True,
+            text=True,
+        )
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) >= 5 and parts[0] == "TCP" and "LISTENING" in line:
+                # Local address format: 0.0.0.0:PORT or [::]:PORT
+                local_addr = parts[1]
+                if local_addr.endswith(f":{port}"):
+                    pids.append(int(parts[4]))
+    else:
+        result = subprocess.run(
+            ["lsof", "-i", f":{port}", "-t", "-sTCP:LISTEN"],
+            capture_output=True,
+            text=True,
+        )
+        for line in result.stdout.strip().splitlines():
+            if line.strip().isdigit():
+                pids.append(int(line.strip()))
+    return list(set(pids))
+
+
+def cleanup_ports():
+    """Check and kill any processes occupying backend/frontend ports."""
+    ports_to_check = [
+        (BACKEND_PORT, "Backend"),
+        (FRONTEND_PORT, "Frontend"),
+    ]
+    killed_any = False
+    for port, label in ports_to_check:
+        pids = find_pids_on_port(port)
+        if pids:
+            print(f"[{label}] Port {port} is occupied by PID(s): {pids}")
+            for pid in pids:
+                if kill_process_tree(pid):
+                    print(f"[{label}]   Killed PID {pid}")
+                else:
+                    print(f"[{label}]   Failed to kill PID {pid}")
+            killed_any = True
+
+    if killed_any:
+        # Brief wait for ports to be fully released
+        import time
+        time.sleep(1)
+        print()
 
 
 def check_uv_available() -> bool:
     return shutil.which("uv") is not None
+
+
+# Env vars that must be present for the app to work correctly.
+_REQUIRED_ENV_KEYS = [
+    ("LANGSMITH_TRACING", False),
+    ("LANGSMITH_API_KEY", False),
+    ("LANGSMITH_PROJECT", False),
+]
+
+
+def _mask(value: str, visible: int = 6) -> str:
+    """Show first `visible` chars, mask the rest."""
+    if len(value) <= visible:
+        return value
+    return value[:visible] + "*" * (len(value) - visible)
+
+
+def _verify_env():
+    """Print .env loading status; exit on missing required keys."""
+    print("[Env] Verifying .env loaded from:", _env_file)
+    if not _env_file.exists():
+        print("[Env] WARNING: .env file not found!")
+        return
+
+    missing_required = []
+    for key, required in _REQUIRED_ENV_KEYS:
+        value = os.environ.get(key)
+        if value:
+            print(f"[Env]   {key} = {_mask(value)}")
+        else:
+            tag = " (REQUIRED)" if required else " (optional)"
+            print(f"[Env]   {key} = <not set>{tag}")
+            if required:
+                missing_required.append(key)
+
+    if missing_required:
+        print(f"\n[Env] ERROR: Missing required env vars: {', '.join(missing_required)}")
+        print("[Env] Please check your .env file.")
+        sys.exit(1)
+    print()
 
 
 def check_node_available() -> bool:
@@ -141,12 +258,19 @@ def cleanup():
     print("\nShutting down all services ...")
     for proc in processes:
         if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
+            if sys.platform == "win32":
+                # taskkill /T kills the whole process tree (handles shell=True)
+                subprocess.run(
+                    ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                    capture_output=True,
+                )
+            else:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
     print("All services stopped.")
 
 
@@ -160,6 +284,12 @@ def main():
 
     if not preflight_check():
         sys.exit(1)
+
+    # Kill any lingering processes on our ports
+    cleanup_ports()
+
+    # Verify .env was loaded correctly
+    _verify_env()
 
     signal.signal(signal.SIGINT, signal_handler)
     if hasattr(signal, "SIGTERM"):
