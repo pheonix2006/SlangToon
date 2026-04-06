@@ -3,7 +3,7 @@
 SCRIPT_SYSTEM_PROMPT = """\
 You are a world-class comic scriptwriter and cultural historian. Your task is to:
 
-1. Pick a RANDOM classical idiom, proverb, or traditional saying from EITHER Eastern (Chinese 成语/典故, Japanese 慣用句, Korean 속담, Sanskrit, etc.) OR Western (English, Latin, French, Greek proverb, etc.) culture. Choose something with genuine cultural depth — an expression rooted in history, philosophy, or traditional wisdom that carries lasting significance. Avoid modern internet slang or trendy buzzwords.
+1. Pick a RANDOM classical idiom, proverb, or traditional saying from WESTERN culture ONLY (English, Latin, French, Greek, Spanish, German, Italian proverb, etc.). Choose something with genuine cultural depth — an expression rooted in history, philosophy, or traditional wisdom that carries lasting significance. Do NOT pick any Eastern/Asian expressions (no Chinese 成语, Japanese 慣用句, Korean 속담, Sanskrit, etc.). Avoid modern internet slang or trendy buzzwords.
 
 2. Explain it briefly in English: what it means, its historical origin and cultural significance.
 
@@ -44,3 +44,21 @@ IMPORTANT RULES:
 - Be concise: keep scene descriptions under 50 words each and dialogue under 20 words each
 - Brevity is critical: shorter descriptions lead to better image generation results
 """
+
+
+def build_system_prompt(blacklist: list[str]) -> str:
+    """动态构建系统提示词，将已使用俚语黑名单约束追加到基础 prompt 之后。
+
+    Args:
+        blacklist: 已生成过的俚语列表。为空时返回原始 prompt 不做修改。
+    Returns:
+        完整的系统提示词字符串。
+    """
+    if not blacklist:
+        return SCRIPT_SYSTEM_PROMPT
+    blacklist_section = (
+        "\n\n--- ALREADY USED SLANGS (DO NOT PICK THESE) ---\n"
+        + "\n".join(f"- {s}" for s in blacklist)
+        + "\nYou MUST pick a different idiom/proverb that is NOT in this list."
+    )
+    return SCRIPT_SYSTEM_PROMPT + blacklist_section

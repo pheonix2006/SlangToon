@@ -5,9 +5,10 @@ export enum AppState {
   COMIC_GENERATING = 'COMIC_GENERATING',
   COMIC_READY = 'COMIC_READY',
   HISTORY = 'HISTORY',
+  GALLERY = 'GALLERY',
 }
 
-export type GestureType = 'ok' | 'open_palm' | 'none';
+export type GestureType = 'ok' | 'open_palm' | 'wave' | 'none';
 
 export interface Panel {
   scene: string;

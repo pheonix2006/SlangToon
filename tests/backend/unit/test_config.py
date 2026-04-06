@@ -28,7 +28,7 @@ class TestDefaultValues:
     def test_default_values(self) -> None:
         s = _make_settings()
         assert s.host == "0.0.0.0"
-        assert s.port == 8888
+        assert s.port == 8889
         assert s.debug is False
         assert s.app_name == "SlangToon"
         assert s.app_version == "1.0.0"
@@ -110,3 +110,27 @@ class TestGetSettings:
         s1 = get_settings()
         s2 = get_settings()
         assert s1 is not s2
+
+
+# ---------------------------------------------------------------------------
+# test_slang_blacklist_config
+# ---------------------------------------------------------------------------
+
+class TestSlangBlacklistConfig:
+    """B-config-01/02: slang_blacklist_file 配置字段"""
+
+    def test_slang_blacklist_file_default(self):
+        """B-config-01: slang_blacklist_file 应有合理默认值"""
+        from app.config import Settings
+        s = _make_settings()
+        assert s.slang_blacklist_file == "data/slang_blacklist.json"
+
+    def test_slang_blacklist_file_from_env(self):
+        """B-config-02: 可通过环境变量覆盖"""
+        import os
+        os.environ["SLANG_BLACKLIST_FILE"] = "/custom/path/blacklist.json"
+        try:
+            s = Settings(_env_file=None)
+            assert s.slang_blacklist_file == "/custom/path/blacklist.json"
+        finally:
+            del os.environ["SLANG_BLACKLIST_FILE"]

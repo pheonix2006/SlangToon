@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { detectGesture, type NormalizedLandmark } from './gestureAlgo';
+import { createWaveBuffer, detectWave } from './gestureAlgo';
 
 /**
  * Helper: create 21 NormalizedLandmark objects with sensible defaults.
@@ -203,5 +204,47 @@ describe('detectGesture', () => {
       expect(result.confidence).toBeGreaterThanOrEqual(0);
       expect(result.confidence).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe('Wave detection', () => {
+  const BUF = 15;
+
+  it('returns false when buffer not full', () => {
+    const buf = createWaveBuffer(BUF);
+    for (let i = 0; i < BUF - 1; i++) { buf.push(0.5); }
+    expect(detectWave(buf, 0.12)).toBe(false);
+  });
+
+  it('detects oscillation above threshold', () => {
+    const buf = createWaveBuffer(BUF);
+    for (let i = 0; i < BUF; i++) { buf.push(i % 2 === 0 ? 0.3 : 0.55); }
+    expect(detectWave(buf, 0.12)).toBe(true);
+  });
+
+  it('returns false for stationary wrist', () => {
+    const buf = createWaveBuffer(BUF);
+    for (let i = 0; i < BUF; i++) { buf.push(0.45); }
+    expect(detectWave(buf, 0.12)).toBe(false);
+  });
+
+  it('returns false below threshold', () => {
+    const buf = createWaveBuffer(BUF);
+    for (let i = 0; i < BUF; i++) { buf.push(i % 2 === 0 ? 0.44 : 0.50); }
+    expect(detectWave(buf, 0.12)).toBe(false);
+  });
+
+  it('handles circular buffer overflow', () => {
+    const buf = createWaveBuffer(BUF);
+    for (let i = 0; i < BUF * 2; i++) { buf.push(i % 2 === 0 ? 0.3 : 0.55); }
+    expect(detectWave(buf, 0.12)).toBe(true);
+  });
+
+  it('resets after clear()', () => {
+    const buf = createWaveBuffer(BUF);
+    for (let i = 0; i < BUF; i++) { buf.push(i % 2 === 0 ? 0.3 : 0.55); }
+    expect(detectWave(buf, 0.12)).toBe(true);
+    buf.clear();
+    expect(detectWave(buf, 0.12)).toBe(false);
   });
 });

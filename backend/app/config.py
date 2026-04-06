@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
     host: str = "0.0.0.0"
-    port: int = 8888
+    port: int = 8889
 
     # Vision LLM (OpenAI-compatible, using GLM-4.6V)
     openai_api_key: str = Field(alias="OPENAI_API_KEY", default="")
@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     # 存储
     comic_storage_dir: str = "data/comics"
     history_file: str = "data/history.json"
+    slang_blacklist_file: str = "data/slang_blacklist.json"
     max_history_records: int = 1000
 
     # CORS

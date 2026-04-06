@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useGestureDetector } from './useGestureDetector';
 import type { NormalizedLandmark } from '../utils/gestureAlgo';
+import type { GestureType } from '../types';
 
 /**
  * Helper: create 21 NormalizedLandmark objects with sensible defaults.
@@ -191,5 +192,131 @@ describe('useGestureDetector', () => {
     expect(onGestureDetected).toHaveBeenCalledWith(
       expect.objectContaining({ gesture: 'ok' }),
     );
+  });
+});
+
+describe('Wave detection integration', () => {
+  /**
+   * Helper: create landmarks with a specific wrist x value.
+   * Uses makeNoneLandmarks as base so detectGesture returns 'none',
+   * allowing wave detection logic to be tested in isolation.
+   */
+  function makeWristLandmarks(wristX: number): NormalizedLandmark[] {
+    const lm = makeNoneLandmarks();
+    lm[0] = { ...lm[0], x: wristX };
+    return lm;
+  }
+
+  it('detects wave gesture after oscillating frames', () => {
+    const gestures: GestureType[] = [];
+    const { result } = renderHook(() =>
+      useGestureDetector({
+        onGestureDetected: (e) => gestures.push(e.gesture),
+        okThreshold: 3,
+        palmThreshold: 2,
+      }),
+    );
+
+    // Simulate oscillating wrist (wave motion) with amplitude > threshold
+    // detectWave needs >= 12 samples and peak-to-peak >= ~0.17
+    for (let i = 0; i < 20; i++) {
+      result.current.processLandmarks(
+        makeWristLandmarks(i % 2 === 0 ? 0.25 : 0.55),
+      );
+    }
+
+    expect(gestures).toContain('wave');
+  });
+
+  it('does not trigger wave for stationary wrist', () => {
+    const gestures: GestureType[] = [];
+    const { result } = renderHook(() =>
+      useGestureDetector({
+        onGestureDetected: (e) => gestures.push(e.gesture),
+        okThreshold: 3,
+        palmThreshold: 2,
+      }),
+    );
+
+    // Stationary wrist - no oscillation
+    for (let i = 0; i < 25; i++) {
+      result.current.processLandmarks(makeWristLandmarks(0.4));
+    }
+
+    expect(gestures).not.toContain('wave');
+  });
+
+  it('clears wave buffer when non-none gesture detected', () => {
+    const gestures: GestureType[] = [];
+    const { result } = renderHook(() =>
+      useGestureDetector({
+        onGestureDetected: (e) => gestures.push(e.gesture),
+        okThreshold: 3,
+        palmThreshold: 2,
+      }),
+    );
+
+    // Some oscillation frames — fewer than min required (10) so no wave triggers yet
+    for (let i = 0; i < 8; i++) {
+      result.current.processLandmarks(
+        makeWristLandmarks(i % 2 === 0 ? 0.25 : 0.55),
+      );
+    }
+
+    // Now send OK gesture repeatedly to fill the wave buffer with stationary values
+    // and also clear any accumulated wave state
+    for (let i = 0; i < 12; i++) {
+      result.current.processLandmarks(makeOKLandmarks());
+    }
+
+    // Continue with stationary none-gesture wrist - should NOT trigger wave
+    // because buffer was cleared by the OK gesture and refilled with stationary data
+    for (let i = 0; i < 10; i++) {
+      result.current.processLandmarks(makeWristLandmarks(0.4));
+    }
+
+    // Wave should not have been triggered during the post-OK stationary phase
+    const waveCount = gestures.filter((g) => g === 'wave').length;
+    // The key assertion: after OK clears the buffer, stationary data shouldn't trigger wave
+    expect(waveCount).toBe(0);
+  });
+
+  it('wave detection does not interfere with existing OK detection', () => {
+    const gestures: GestureType[] = [];
+    const { result } = renderHook(() =>
+      useGestureDetector({
+        onGestureDetected: (e) => gestures.push(e.gesture),
+        okThreshold: 3,
+        palmThreshold: 2,
+      }),
+    );
+
+    // Send enough OK frames to trigger
+    for (let i = 0; i < 3; i++) {
+      result.current.processLandmarks(makeOKLandmarks());
+    }
+
+    expect(gestures).toContain('ok');
+    // No false wave during OK detection
+    expect(gestures).not.toContain('wave');
+  });
+
+  it('wave detection does not interfere with existing open_palm detection', () => {
+    const gestures: GestureType[] = [];
+    const { result } = renderHook(() =>
+      useGestureDetector({
+        onGestureDetected: (e) => gestures.push(e.gesture),
+        okThreshold: 3,
+        palmThreshold: 2,
+      }),
+    );
+
+    // Send enough palm frames to trigger
+    for (let i = 0; i < 2; i++) {
+      result.current.processLandmarks(makePalmLandmarks());
+    }
+
+    expect(gestures).toContain('open_palm');
+    expect(gestures).not.toContain('wave');
   });
 });

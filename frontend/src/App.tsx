@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { AppState } from './types';
-import type { ScriptData, HistoryItem } from './types';
+import type { GestureType, ScriptData, HistoryItem } from './types';
 import { useCamera } from './hooks/useCamera';
 import { useGestureDetector } from './hooks/useGestureDetector';
 import { useMediaPipeHands } from './hooks/useMediaPipeHands';
@@ -11,6 +11,7 @@ import CameraView from './components/CameraView/CameraView';
 import ScriptPreview from './components/ScriptPreview/ScriptPreview';
 import ComicDisplay from './components/ComicDisplay/ComicDisplay';
 import HistoryList from './components/HistoryList/HistoryList';
+import GalleryView from './components/GalleryView/GalleryView';
 import ErrorDisplay from './components/ErrorDisplay';
 import LoadingOrb from './components/LoadingOrb';
 
@@ -21,6 +22,7 @@ function App() {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [galleryItems, setGalleryItems] = useState<HistoryItem[]>([]);
 
   const appStateRef = useRef<AppState>(appState);
   useEffect(() => {
@@ -39,6 +41,24 @@ function App() {
     setError(null);
     setAppState(AppState.HISTORY);
   }, []);
+
+  // ── Idle Timer ──
+  const IDLE_TIMEOUT_MS = 20_000;
+  const IDLE_STATES = new Set([AppState.CAMERA_READY, AppState.COMIC_READY]);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => setAppState(AppState.GALLERY), IDLE_TIMEOUT_MS);
+  }, []);
+
+  const resetIdleTimer = useCallback(() => { startIdleTimer(); }, [startIdleTimer]);
+
+  useEffect(() => {
+    if (IDLE_STATES.has(appState)) startIdleTimer();
+    else if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
+    return () => { if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
+  }, [appState, startIdleTimer]);
 
   // ── Camera ──
   const { videoRef, isReady, error: cameraError, restart: restartCamera } = useCamera();
@@ -60,17 +80,14 @@ function App() {
 
   // ── Gesture handling ──
   const onGestureDetected = useCallback(
-    (event: { gesture: 'ok' | 'open_palm' | 'none'; confidence: number }) => {
+    (event: { gesture: GestureType; confidence: number }) => {
       const state = appStateRef.current;
-      if (event.gesture === 'ok' && state === AppState.CAMERA_READY) {
-        handleGenerateScript();
-        return;
-      }
-      if (event.gesture === 'open_palm' && state !== AppState.COMIC_READY) {
-        goHome();
-      }
+      if (IDLE_STATES.has(state)) resetIdleTimer();
+      if (event.gesture === 'ok' && state === AppState.CAMERA_READY) { handleGenerateScript(); return; }
+      if (event.gesture === 'open_palm' && state !== AppState.COMIC_READY) { goHome(); return; }
+      if (event.gesture === 'wave' && state === AppState.GALLERY) { setAppState(AppState.CAMERA_READY); return; }
     },
-    [goHome, handleGenerateScript],
+    [goHome, handleGenerateScript, resetIdleTimer],
   );
 
   const { processLandmarks } = useGestureDetector({ onGestureDetected });
@@ -132,8 +149,16 @@ function App() {
     }
   }, [appState, fetchHistory]);
 
+  // ── Gallery data ──
+  useEffect(() => {
+    if (appState === AppState.GALLERY) {
+      getHistory(1, 50).then(r => setGalleryItems(r.data.items)).catch(() => {});
+    }
+  }, [appState]);
+
   // ── Render ──
-  const showCamera = appState === AppState.CAMERA_READY;
+  // Camera must stay alive in GALLERY mode so MediaPipe can detect wave gestures
+  const showCamera = appState === AppState.CAMERA_READY || appState === AppState.GALLERY;
   const isHistory = appState === AppState.HISTORY;
 
   return (
@@ -143,7 +168,14 @@ function App() {
 
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-8 py-5 shrink-0">
-        {isHistory ? (
+        {appState === AppState.GALLERY ? (
+          <div className="w-full text-center">
+            <span className="text-[10px] tracking-[0.25em] font-display"
+                  style={{ color:'rgba(255,183,77,0.3)' }}>
+              SLANGTOON GALLERY
+            </span>
+          </div>
+        ) : isHistory ? (
           <button
             onClick={goHome}
             className="text-[10px] tracking-[0.15em] font-display cursor-pointer"
@@ -177,16 +209,18 @@ function App() {
           ? 'justify-start'
           : 'justify-center'
       }`}>
-        {/* CAMERA_READY */}
+        {/* CAMERA_READY / GALLERY (camera stays alive for gesture detection) */}
         {showCamera && (
           <PageTransition>
-            <div className="relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden glass-panel">
+            <div className={`relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden glass-panel ${
+              appState === AppState.GALLERY ? 'absolute opacity-0 pointer-events-none w-0 h-0 overflow-hidden' : ''
+            }`}>
               <CameraView
                 videoRef={videoRef}
                 canvasRef={canvasRef}
                 className={`w-full h-full ${isReady ? '' : 'invisible'}`}
               />
-              {!isReady && (
+              {!isReady && appState !== AppState.GALLERY && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
                   {cameraError ? (
                     <ErrorDisplay message={cameraError} onRetry={restartCamera} retryText="Restart Camera" />
@@ -198,14 +232,16 @@ function App() {
                 </div>
               )}
             </div>
-            <div className="mt-5 text-center">
-              {error && (
-                <p className="text-sm mb-2" style={{ color: 'rgba(255,183,77,0.6)' }}>{error}</p>
-              )}
-              <p className="text-[11px] tracking-[0.1em] font-display" style={{ color: 'rgba(255,183,77,0.35)' }}>
-                Show OK sign to generate · Open palm to go back
-              </p>
-            </div>
+            {appState === AppState.CAMERA_READY && (
+              <div className="mt-5 text-center">
+                {error && (
+                  <p className="text-sm mb-2" style={{ color: 'rgba(255,183,77,0.6)' }}>{error}</p>
+                )}
+                <p className="text-[11px] tracking-[0.1em] font-display" style={{ color: 'rgba(255,183,77,0.35)' }}>
+                  Show OK sign to generate · Open palm to go back
+                </p>
+              </div>
+            )}
           </PageTransition>
         )}
 
@@ -266,6 +302,13 @@ function App() {
               onRetry={fetchHistory}
               onBack={goHome}
             />
+          </PageTransition>
+        )}
+
+        {/* GALLERY */}
+        {appState === AppState.GALLERY && (
+          <PageTransition>
+            <GalleryView items={galleryItems} />
           </PageTransition>
         )}
       </main>
