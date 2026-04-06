@@ -12,8 +12,8 @@ class ScriptData(BaseModel):
     slang: str = Field(..., description="The slang or idiom")
     origin: str = Field(..., description="Cultural origin (Eastern/Western)")
     explanation: str = Field(..., description="Brief explanation of the slang")
-    panel_count: int = Field(..., ge=4, le=6, description="Number of panels (4-6)")
-    panels: list[Panel] = Field(..., min_length=4, max_length=6, description="Panel descriptions")
+    panel_count: int = Field(..., ge=8, le=12, description="Number of panels (8-12)")
+    panels: list[Panel] = Field(..., min_length=8, max_length=12, description="Panel descriptions")
 
 
 class ScriptRequest(BaseModel):

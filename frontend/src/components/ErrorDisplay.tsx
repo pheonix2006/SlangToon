@@ -1,3 +1,5 @@
+import GlassButton from './GlassButton';
+
 interface ErrorDisplayProps {
   message: string;
   onRetry?: () => void;
@@ -7,31 +9,24 @@ interface ErrorDisplayProps {
 export default function ErrorDisplay({
   message,
   onRetry,
-  retryText = '重试',
+  retryText = 'Retry',
 }: ErrorDisplayProps) {
   return (
-    <div className="flex flex-col items-center gap-4 text-center px-4">
-      <svg
-        className="h-12 w-12 text-red-400"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
+    <div className="flex flex-col items-center gap-5 text-center px-4" style={{ animation: 'fade-scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
+      {/* Gold ring with exclamation */}
+      <div
+        className="w-12 h-12 rounded-full flex items-center justify-center"
+        style={{ border: '1.5px solid rgba(255,183,77,0.3)' }}
       >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-        />
-      </svg>
-      <p className="text-red-400 max-w-md">{message}</p>
+        <span className="text-lg" style={{ color: 'rgba(255,183,77,0.6)' }}>!</span>
+      </div>
+      <p className="text-sm max-w-md" style={{ color: 'rgba(255,255,255,0.6)' }}>
+        {message}
+      </p>
       {onRetry && (
-        <button
-          className="px-6 py-2 bg-indigo-600 rounded hover:bg-indigo-500 transition-colors"
-          onClick={onRetry}
-        >
+        <GlassButton onClick={onRetry}>
           {retryText}
-        </button>
+        </GlassButton>
       )}
     </div>
   );

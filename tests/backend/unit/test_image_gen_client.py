@@ -400,7 +400,7 @@ class TestGenerateFromText:
             mp.setattr(httpx.AsyncClient, "post", mock_post)
             mp.setattr(httpx.AsyncClient, "get", mock_get)
             result = await client.generate_from_text(
-                prompt="A 4-panel manga comic strip",
+                prompt="A 8-panel manga comic strip",
             )
 
         assert result.startswith("data:image/png;base64,")

@@ -1,18 +1,25 @@
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 
 class HistoryService:
-    def __init__(self, history_file: str, max_records: int = 1000):
+    def __init__(self, history_file: str, max_records: int = 1000) -> None:
         self.history_file = Path(history_file)
         self.max_records = max_records
 
     def _load(self) -> list[dict]:
         if not self.history_file.exists():
             return []
-        return json.loads(self.history_file.read_text(encoding="utf-8"))
+        try:
+            return json.loads(self.history_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            logger.warning("历史记录文件 JSON 格式损坏，已重置: %s", self.history_file)
+            return []
 
     def _save(self, records: list[dict]):
         self.history_file.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")

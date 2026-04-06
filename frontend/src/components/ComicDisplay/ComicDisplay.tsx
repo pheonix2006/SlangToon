@@ -1,11 +1,12 @@
+import GlassButton from '../GlassButton';
+
 interface ComicDisplayProps {
   comicUrl: string;
   slang: string;
   onNew: () => void;
-  onGoToHistory: () => void;
 }
 
-export default function ComicDisplay({ comicUrl, slang, onNew, onGoToHistory }: ComicDisplayProps) {
+export default function ComicDisplay({ comicUrl, slang, onNew }: ComicDisplayProps) {
   const handleDownload = () => {
     const link = document.createElement('a');
     link.href = comicUrl;
@@ -14,10 +15,17 @@ export default function ComicDisplay({ comicUrl, slang, onNew, onGoToHistory }: 
   };
 
   return (
-    <div className="w-full max-w-4xl px-6 py-8">
-      <h2 className="text-xl font-bold text-yellow-400 mb-4 text-center">&quot;{slang}&quot;</h2>
+    <div className="w-full max-w-4xl px-6 py-6">
+      {/* Slang title */}
+      <h2
+        className="text-xl italic font-accent text-center mb-5"
+        style={{ color: '#FFF3E0' }}
+      >
+        &ldquo;{slang}&rdquo;
+      </h2>
 
-      <div className="rounded-xl overflow-hidden shadow-2xl border border-gray-700">
+      {/* Comic image */}
+      <div className="rounded-xl overflow-hidden gold-border gold-glow">
         <img
           src={comicUrl}
           alt={`Comic strip for "${slang}"`}
@@ -25,25 +33,14 @@ export default function ComicDisplay({ comicUrl, slang, onNew, onGoToHistory }: 
         />
       </div>
 
-      <div className="flex gap-4 justify-center mt-6">
-        <button
-          onClick={handleDownload}
-          className="px-6 py-3 bg-green-600 rounded-lg hover:bg-green-500 transition-colors"
-        >
+      {/* Action buttons */}
+      <div className="flex gap-3 justify-center mt-6">
+        <GlassButton onClick={handleDownload}>
           Download
-        </button>
-        <button
-          onClick={onGoToHistory}
-          className="px-6 py-3 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
-        >
-          History
-        </button>
-        <button
-          onClick={onNew}
-          className="px-6 py-3 bg-indigo-600 rounded-lg hover:bg-indigo-500 transition-colors"
-        >
+        </GlassButton>
+        <GlassButton variant="secondary" onClick={onNew}>
           New Slang
-        </button>
+        </GlassButton>
       </div>
     </div>
   );

@@ -1,11 +1,106 @@
 @import "tailwindcss";
 
+/* ── CSS Custom Properties ── */
+:root {
+  --gold-50: #fff3e0;
+  --gold-100: #ffe0b2;
+  --gold-200: #ffcc80;
+  --gold-300: #ffb74d;
+  --gold-400: #ffa726;
+  --gold-500: #ff9800;
+  --gold-600: #fb8c00;
+  --gold-700: #f57c00;
+  --glass-bg: rgba(255, 183, 77, 0.08);
+  --glass-border: rgba(255, 183, 77, 0.15);
+  --glow-color: rgba(255, 183, 77, 0.15);
+}
+
+/* ── Keyframes ── */
+@keyframes glow-pulse {
+  0%, 100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes glow-float-1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -20px) scale(1.1);
+  }
+  50% {
+    transform: translate(-20px, 15px) scale(0.95);
+  }
+  75% {
+    transform: translate(15px, 25px) scale(1.05);
+  }
+}
+
+@keyframes glow-float-2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(-25px, 20px) scale(1.08);
+  }
+  66% {
+    transform: translate(20px, -15px) scale(0.92);
+  }
+}
+
+@keyframes glow-float-3 {
+  0%, 100% {
+    transform: translate(0, 0) scale(0.95);
+  }
+  50% {
+    transform: translate(10px, -30px) scale(1.1);
+  }
+}
+
+@keyframes fade-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes spin-gold-ring {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orb-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* ── Global Styles ── */
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #0a0a0a;
+  background-color: #000000;
   color: #ffffff;
   overflow: hidden;
 }
@@ -13,4 +108,26 @@ body {
 #root {
   width: 100vw;
   height: 100vh;
+}
+
+/* ── Utility Classes ── */
+.glass-panel {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+
+.gold-border {
+  border: 1px solid rgba(255, 183, 77, 0.2);
+}
+
+.gold-glow {
+  box-shadow: 0 0 20px rgba(255, 183, 77, 0.15);
+}
+
+.font-display {
+  font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+}
+
+.font-accent {
+  font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
 }

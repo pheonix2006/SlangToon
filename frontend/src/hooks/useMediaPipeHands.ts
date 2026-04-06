@@ -33,10 +33,12 @@ function drawHandLandmarks(
 ) {
   ctx.clearRect(0, 0, width, height);
 
-  // Draw connections (green lines)
-  ctx.strokeStyle = '#22c55e';
-  ctx.lineWidth = 3;
+  // Draw connections (gold lines)
+  ctx.strokeStyle = 'rgba(255, 183, 77, 0.4)';
+  ctx.lineWidth = 2;
   ctx.lineCap = 'round';
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
 
   for (const [start, end] of HAND_CONNECTIONS) {
     const from = landmarks[start];
@@ -49,13 +51,19 @@ function drawHandLandmarks(
     ctx.stroke();
   }
 
-  // Draw landmark dots (red)
-  ctx.fillStyle = '#ef4444';
+  // Draw landmark dots (gold with glow)
+  ctx.shadowColor = 'rgba(255, 183, 77, 0.6)';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#FFB74D';
   for (const lm of landmarks) {
     ctx.beginPath();
-    ctx.arc(lm.x * width, lm.y * height, 4, 0, 2 * Math.PI);
+    ctx.arc(lm.x * width, lm.y * height, 5, 0, 2 * Math.PI);
     ctx.fill();
   }
+
+  // Reset shadow
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
 }
 
 export function useMediaPipeHands({

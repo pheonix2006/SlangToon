@@ -7,6 +7,7 @@ class Settings(BaseSettings):
         env_file="../.env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # 应用配置
@@ -20,8 +21,8 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(alias="OPENAI_API_KEY", default="")
     openai_base_url: str = Field(alias="OPENAI_BASE_URL", default="https://open.bigmodel.cn/api/paas/v4")
     openai_model: str = Field(alias="OPENAI_MODEL", default="glm-4.6v")
-    vision_llm_max_tokens: int = 4096
-    vision_llm_timeout: int = 90
+    vision_llm_max_tokens: int = 8192
+    vision_llm_timeout: int = 120
     vision_llm_max_retries: int = 2
 
     # Qwen Image 2.0
@@ -46,12 +47,6 @@ class Settings(BaseSettings):
     trace_enabled: bool = True
     trace_dir: str = "data/traces"
     trace_retention_days: int = 7
-
-    # LangSmith (optional LLM observability)
-    langsmith_enabled: bool = False
-    langsmith_api_key: str = ""
-    langsmith_project: str = "slangtoon"
-    langsmith_endpoint: str = "https://api.smith.langchain.com"
 
     @property
     def cors_origin_list(self) -> list[str]:

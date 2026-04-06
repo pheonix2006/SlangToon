@@ -1,5 +1,5 @@
 from app.prompts.script_prompt import SCRIPT_SYSTEM_PROMPT
-from app.prompts.comic_prompt import build_comic_prompt, MAX_PROMPT_LENGTH
+from app.prompts.comic_prompt import build_comic_prompt, count_tokens, MAX_PROMPT_TOKENS
 
 
 class TestScriptPrompt:
@@ -47,8 +47,8 @@ class TestBuildComicPrompt:
         assert "8-panel" in prompt
         assert "Cat: Meow" in prompt
 
-    def test_prompt_within_char_limit(self):
-        """Prompt must never exceed MAX_PROMPT_LENGTH (780 chars, API limit 800)."""
+    def test_prompt_within_token_limit(self):
+        """Prompt must never exceed MAX_PROMPT_TOKENS (950, API limit 1000)."""
         panels = [
             {"scene": "x" * 200, "dialogue": "y" * 100}
         ] * 12
@@ -56,7 +56,7 @@ class TestBuildComicPrompt:
             slang="test-slang", origin="test-origin", explanation="test",
             panels=panels,
         )
-        assert len(prompt) <= MAX_PROMPT_LENGTH
+        assert count_tokens(prompt) <= MAX_PROMPT_TOKENS
 
     def test_all_panels_present_in_prompt(self):
         """Even with 12 panels, all should be mentioned (P1..P12)."""
@@ -84,14 +84,14 @@ class TestBuildComicPrompt:
     def test_dialogue_truncation(self):
         panels = [{"scene": "short", "dialogue": "a" * 100}]
         prompt = build_comic_prompt("s", "o", "e", panels)
-        assert len(prompt) <= MAX_PROMPT_LENGTH
+        assert count_tokens(prompt) <= MAX_PROMPT_TOKENS
         # Verify dialogue is still present after truncation
-        assert '"a' in prompt or "P1:" in prompt
+        assert "P1:" in prompt
 
     def test_scene_truncation(self):
         panels = [{"scene": "a" * 200, "dialogue": ""}]
         prompt = build_comic_prompt("s", "o", "e", panels)
-        assert "..." in prompt or len(prompt) <= MAX_PROMPT_LENGTH
+        assert count_tokens(prompt) <= MAX_PROMPT_TOKENS
 
     def test_progressive_compression_with_many_panels(self):
         """12 panels with long text should still fit via progressive compression."""
@@ -108,7 +108,7 @@ class TestBuildComicPrompt:
             explanation="Blessing in disguise",
             panels=panels,
         )
-        assert len(prompt) <= MAX_PROMPT_LENGTH
+        assert count_tokens(prompt) <= MAX_PROMPT_TOKENS
         # All 12 panels should still be present
         for i in range(1, 13):
             assert f"P{i}:" in prompt

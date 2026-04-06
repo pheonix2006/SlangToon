@@ -41,5 +41,14 @@ frontend/test-results/
 # Superpowers
 .superpowers/
 
+# Serena MCP
+.serena/
+
+# Docs (plans/specs, not tracked)
+docs/
+
+# Data files (runtime generated)
+data/
+
 # School coursework
 school/

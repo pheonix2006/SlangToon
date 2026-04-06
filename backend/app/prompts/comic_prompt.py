@@ -2,10 +2,6 @@
 
 import tiktoken
 
-# Qwen Image 2.0 text field hard limit: 800 characters.
-# API auto-truncates anything beyond this. Leave 20-char safety margin.
-MAX_PROMPT_LENGTH = 780
-
 # Qwen Image 2.0 token hard limit: 1000 tokens.
 # Leave 50-token safety margin to avoid truncation.
 MAX_PROMPT_TOKENS = 950
@@ -46,23 +42,36 @@ def _get_layout(panel_count: int) -> str:
 def _build_panel_lines(
     panels: list[dict],
     max_scene: int,
-    max_dialogue: int,
+    max_dialogue: int | None,
 ) -> list[str]:
-    """Build compact panel description lines."""
+    """Build panel description lines with clean truncation (no ellipsis markers)."""
     lines = []
     for i, panel in enumerate(panels, 1):
         scene = panel.get("scene", "")
         dialogue = panel.get("dialogue", "").strip()
-        # Truncate
+
+        # Clean truncation — never add "..." markers
         if len(scene) > max_scene:
-            scene = scene[: max_scene - 3] + "..."
+            scene = scene[:max_scene]
+
         line = f"P{i}: {scene}"
         if dialogue:
-            if len(dialogue) > max_dialogue:
-                dialogue = dialogue[: max_dialogue - 3] + "..."
-            line += f'. "{dialogue}"'
+            if max_dialogue is not None and len(dialogue) > max_dialogue:
+                dialogue = dialogue[:max_dialogue]
+            line += f". {dialogue}"
         lines.append(line)
     return lines
+
+
+def _try_prompt_tokens(panels: list[dict], header: str, footer: str,
+                       max_scene: int, max_dialogue: int | None) -> str | None:
+    """Build prompt with given compression level; return it if within token budget, else None."""
+    lines = _build_panel_lines(panels, max_scene, max_dialogue)
+    panels_text = " ".join(lines)
+    prompt = header + panels_text + footer
+    if count_tokens(prompt) <= MAX_PROMPT_TOKENS:
+        return prompt
+    return None
 
 
 def build_comic_prompt(
@@ -71,48 +80,47 @@ def build_comic_prompt(
     explanation: str,
     panels: list[dict],
 ) -> str:
-    """Build a compact visual prompt within Qwen Image 2.0's 800-char limit.
+    """Build a visual prompt within Qwen Image 2.0's 1000-token limit.
 
-    Uses progressive compression: starts with fuller descriptions and reduces
-    until the entire prompt fits within MAX_PROMPT_LENGTH.
+    Strategy: keep full dialogue whenever possible — compress scene
+    descriptions first, only trim dialogue as a last resort. Never use
+    "..." truncation markers that the model would render literally.
     """
     panel_count = len(panels)
     layout = _get_layout(panel_count)
 
     # Fixed parts of the prompt
-    header = f"A {panel_count}-panel {layout} manga comic strip, 16:9. " \
-             f'Title: "{slang}" ({origin}). All scenes in modern setting. '
-    footer = " Style: clean manga line art, warm colors, clear panel borders, white gutters, speech bubbles."
+    header = (
+        f"A {panel_count}-panel {layout} manga comic strip, 9:16 portrait. "
+        f'Title: "{slang}" ({origin}). All scenes in modern setting. '
+    )
+    footer = (
+        " Style: clean manga line art, warm colors, clear panel borders, "
+        "white gutters, speech bubbles."
+    )
 
-    # Calculate available budget for panel descriptions
-    overhead = len(header) + len(footer)
-    budget = MAX_PROMPT_LENGTH - overhead
+    # Stage 1: full dialogue, progressively shrink scene descriptions
+    scene_only_levels = [120, 80, 60, 40]
+    for max_scene in scene_only_levels:
+        result = _try_prompt_tokens(panels, header, footer, max_scene, None)
+        if result:
+            return result
 
-    # Progressive compression: try decreasing truncation limits
-    compression_levels = [
-        (60, 30),   # Level 1: moderate compression
-        (40, 20),   # Level 2: tight compression
-        (25, 15),   # Level 3: heavy compression
-        (15, 10),   # Level 4: ultra-compact
+    # Stage 2: also trim dialogue, keep generous dialogue budget
+    dialogue_levels = [
+        (40, 60),
+        (30, 40),
+        (25, 30),
+        (20, 20),
+        (15, 15),
     ]
+    for max_scene, max_dialogue in dialogue_levels:
+        result = _try_prompt_tokens(panels, header, footer, max_scene, max_dialogue)
+        if result:
+            return result
 
-    panels_text = ""
-    for max_scene, max_dialogue in compression_levels:
-        lines = _build_panel_lines(panels, max_scene, max_dialogue)
-        panels_text = " ".join(lines)
-        if len(panels_text) <= budget:
-            break
-    else:
-        # Last resort: scene-only, no dialogue, minimal text
-        lines = [f"P{i}: {p.get('scene', '')[:20]}" for i, p in enumerate(panels, 1)]
-        panels_text = " ".join(lines)
-        if len(panels_text) > budget:
-            panels_text = panels_text[: budget - 3] + "..."
-
+    # Stage 3: hard token truncation as last resort
+    lines = _build_panel_lines(panels, 15, 15)
+    panels_text = " ".join(lines)
     prompt = header + panels_text + footer
-
-    # Final safety net
-    if len(prompt) > MAX_PROMPT_LENGTH:
-        prompt = prompt[: MAX_PROMPT_LENGTH - 3] + "..."
-
-    return prompt
+    return _truncate_prompt_to_tokens(prompt, MAX_PROMPT_TOKENS)

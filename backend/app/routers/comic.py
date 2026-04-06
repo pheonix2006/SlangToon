@@ -1,4 +1,4 @@
-"""POST /api/generate-comic — Generate comic strip image from script."""
+"""POST /api/generate-comic -- Generate comic strip image from script."""
 
 import logging
 
@@ -8,11 +8,8 @@ from app.config import Settings
 from app.dependencies import get_cached_settings
 from app.schemas.common import ApiResponse, ErrorCode
 from app.schemas.comic import ComicRequest, ComicResponse
-from app.services.image_gen_client import (
-    ImageGenTimeoutError,
-    ImageGenApiError,
-)
-from app.tracing.decorators import with_trace
+from app.services.image_gen_client import ImageGenTimeoutError, ImageGenApiError
+from app.graphs.trace_collector import GraphExecutionError
 
 logger = logging.getLogger(__name__)
 
@@ -24,23 +21,43 @@ router = APIRouter(prefix="/api", tags=["comic"])
     response_model=ApiResponse,
     responses={500: {"description": "Image generation error"}},
 )
-@with_trace("comic", error_map={
-    ImageGenTimeoutError: (ErrorCode.IMAGE_GEN_FAILED, "Image generation timeout"),
-    ImageGenApiError: (ErrorCode.IMAGE_GEN_FAILED, "Image generation error"),
-})
 async def generate_comic_endpoint(
     request: ComicRequest,
     settings: Settings = Depends(get_cached_settings),
     response: Response = None,
 ):
-    """Generate a 16:9 comic strip image from the script."""
-    from app.services.comic_service import generate_comic
+    """Generate a comic strip image from the script."""
+    from app.graphs.comic_graph import build_comic_graph
+    from app.graphs.trace_collector import invoke_with_trace
+    from app.logging_config import request_id_ctx
 
-    data = await generate_comic(request.model_dump(), settings)
+    graph = build_comic_graph()
+    inputs = request.model_dump()
+
+    def _set_trace_id(tid: str | None):
+        if tid and response:
+            response.headers["x-trace-id"] = tid
+
+    try:
+        result, trace_id = await invoke_with_trace(
+            graph,
+            inputs,
+            settings,
+            flow_type="comic",
+            request_id=request_id_ctx.get(""),
+        )
+    except GraphExecutionError as exc:
+        _set_trace_id(exc.trace_id)
+        original = exc.original_error
+        if isinstance(original, (ImageGenTimeoutError, ImageGenApiError)):
+            return ApiResponse(code=ErrorCode.IMAGE_GEN_FAILED, message="Image generation error", data=None)
+        return ApiResponse(code=ErrorCode.INTERNAL_ERROR, message="Internal error", data=None)
+
+    _set_trace_id(trace_id)
 
     response_data = ComicResponse(
-        comic_url=data["comic_url"],
-        thumbnail_url=data["thumbnail_url"],
-        history_id=data["history_id"],
+        comic_url=result["comic_url"],
+        thumbnail_url=result["thumbnail_url"],
+        history_id=result["history_id"],
     )
     return ApiResponse(data=response_data.model_dump())

@@ -69,7 +69,7 @@ async def test_history_with_data(client, tmp_data_dir):
     history_file = tmp_data_dir / "history.json"
     records = [
         {"id": f"id-{i}", "slang": f"slang-{i}", "origin": "Western",
-         "explanation": f"explain-{i}", "panel_count": 4,
+         "explanation": f"explain-{i}", "panel_count": 8,
          "comic_url": f"/comic-{i}.png", "thumbnail_url": f"/thumb-{i}.png",
          "comic_prompt": f"prompt-{i}", "created_at": f"2026-03-{29 - i:02d}T12:00:00+00:00"}
         for i in range(5)
@@ -90,11 +90,11 @@ async def test_history_order_descending(client, tmp_data_dir):
     history_file = tmp_data_dir / "history.json"
     records = [
         {"id": "first", "slang": "old-slang", "origin": "Western",
-         "explanation": "old explain", "panel_count": 4,
+         "explanation": "old explain", "panel_count": 8,
          "comic_url": "/c1.png", "thumbnail_url": "/t1.png",
          "comic_prompt": "p1", "created_at": "2026-03-28T10:00:00+00:00"},
         {"id": "second", "slang": "new-slang", "origin": "Eastern",
-         "explanation": "new explain", "panel_count": 5,
+         "explanation": "new explain", "panel_count": 9,
          "comic_url": "/c2.png", "thumbnail_url": "/t2.png",
          "comic_prompt": "p2", "created_at": "2026-03-29T10:00:00+00:00"},
     ]
@@ -121,7 +121,7 @@ async def test_history_record_fields_complete(client, tmp_data_dir):
     history_file = tmp_data_dir / "history.json"
     record = {
         "id": "test-id", "slang": "Break a leg", "origin": "Western",
-        "explanation": "Good luck wish", "panel_count": 4,
+        "explanation": "Good luck wish", "panel_count": 8,
         "comic_url": "/comic.png", "thumbnail_url": "/thumb.png",
         "comic_prompt": "neon lights", "created_at": "2026-03-29T12:00:00+00:00",
     }
@@ -144,7 +144,7 @@ async def test_history_page_size_one(client, tmp_data_dir):
     history_file = tmp_data_dir / "history.json"
     records = [
         {"id": f"id-{i}", "slang": f"s{i}", "origin": "Western",
-         "explanation": f"exp-{i}", "panel_count": 4,
+         "explanation": f"exp-{i}", "panel_count": 8,
          "comic_url": f"/c{i}.png", "thumbnail_url": f"/t{i}.png",
          "comic_prompt": f"p{i}", "created_at": "2026-03-29T12:00:00+00:00"}
         for i in range(3)

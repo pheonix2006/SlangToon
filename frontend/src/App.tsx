@@ -5,15 +5,16 @@ import { useCamera } from './hooks/useCamera';
 import { useGestureDetector } from './hooks/useGestureDetector';
 import { useMediaPipeHands } from './hooks/useMediaPipeHands';
 import { generateScript, generateComic, getHistory } from './services/api';
+import GlowBackground from './components/GlowBackground/GlowBackground';
+import PageTransition from './components/PageTransition';
 import CameraView from './components/CameraView/CameraView';
 import ScriptPreview from './components/ScriptPreview/ScriptPreview';
 import ComicDisplay from './components/ComicDisplay/ComicDisplay';
 import HistoryList from './components/HistoryList/HistoryList';
 import ErrorDisplay from './components/ErrorDisplay';
-import LoadingSpinner from './components/LoadingSpinner';
+import LoadingOrb from './components/LoadingOrb';
 
 function App() {
-  // ── State machine ──
   const [appState, setAppState] = useState<AppState>(AppState.CAMERA_READY);
   const [scriptData, setScriptData] = useState<ScriptData | null>(null);
   const [comicUrl, setComicUrl] = useState<string>('');
@@ -26,10 +27,11 @@ function App() {
     appStateRef.current = appState;
   }, [appState]);
 
-  // ── Navigation helpers ──
+  // ── Navigation ──
   const goHome = useCallback(() => {
     setScriptData(null);
     setComicUrl('');
+    setError(null);
     setAppState(AppState.CAMERA_READY);
   }, []);
 
@@ -38,14 +40,13 @@ function App() {
     setAppState(AppState.HISTORY);
   }, []);
 
-  // ── Camera hook ──
+  // ── Camera ──
   const { videoRef, isReady, error: cameraError, restart: restartCamera } = useCamera();
 
   // ── Script generation ──
   const handleGenerateScript = useCallback(async () => {
     setError(null);
     setAppState(AppState.SCRIPT_LOADING);
-
     try {
       const response = await generateScript();
       setScriptData(response.data);
@@ -61,12 +62,10 @@ function App() {
   const onGestureDetected = useCallback(
     (event: { gesture: 'ok' | 'open_palm' | 'none'; confidence: number }) => {
       const state = appStateRef.current;
-
       if (event.gesture === 'ok' && state === AppState.CAMERA_READY) {
         handleGenerateScript();
         return;
       }
-
       if (event.gesture === 'open_palm' && state !== AppState.COMIC_READY) {
         goHome();
       }
@@ -93,10 +92,8 @@ function App() {
   // ── Comic generation ──
   const handleGenerateComic = useCallback(async () => {
     if (!scriptData) return;
-
     setError(null);
     setAppState(AppState.COMIC_GENERATING);
-
     try {
       const response = await generateComic({
         slang: scriptData.slang,
@@ -137,108 +134,139 @@ function App() {
 
   // ── Render ──
   const showCamera = appState === AppState.CAMERA_READY;
+  const isHistory = appState === AppState.HISTORY;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+    <div className="relative w-full h-full bg-black text-white flex flex-col">
+      {/* Global glow background */}
+      <GlowBackground />
+
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-gray-800 shrink-0">
-        <h1
-          className="text-xl font-bold cursor-pointer select-none"
-          onClick={goHome}
-        >
-          SlangToon
-        </h1>
-        <button
-          className="px-4 py-2 text-sm bg-gray-700 rounded hover:bg-gray-600 transition-colors"
-          onClick={goHistory}
-        >
-          History
-        </button>
+      <header className="relative z-10 flex items-center justify-between px-8 py-5 shrink-0">
+        {isHistory ? (
+          <button
+            onClick={goHome}
+            className="text-[10px] tracking-[0.15em] font-display cursor-pointer"
+            style={{ color: 'rgba(255,183,77,0.4)' }}
+          >
+            ← Back
+          </button>
+        ) : (
+          <button
+            onClick={goHome}
+            className="text-[10px] tracking-[0.25em] font-display font-light cursor-pointer"
+            style={{ color: 'rgba(255,183,77,0.3)' }}
+          >
+            SLANGTOON
+          </button>
+        )}
+        {!isHistory && (
+          <button
+            onClick={goHistory}
+            className="text-[10px] tracking-[0.15em] font-display cursor-pointer"
+            style={{ color: 'rgba(255,183,77,0.25)' }}
+          >
+            History →
+          </button>
+        )}
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center overflow-auto">
+      <main className={`relative z-10 flex-1 flex flex-col items-center overflow-auto px-4 ${
+        (appState === AppState.COMIC_READY || appState === AppState.SCRIPT_PREVIEW)
+          ? 'justify-start'
+          : 'justify-center'
+      }`}>
+        {/* CAMERA_READY */}
         {showCamera && (
-          <div className="relative w-full max-w-3xl aspect-video bg-gray-800 rounded-xl overflow-hidden">
-            <CameraView
-              videoRef={videoRef}
-              canvasRef={canvasRef}
-              className={`w-full h-full ${isReady ? '' : 'invisible'}`}
-            />
-            {!isReady && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                {cameraError ? (
-                  <ErrorDisplay message={cameraError} onRetry={restartCamera} retryText="Restart Camera" />
-                ) : (
-                  <p className="text-gray-400">Starting camera...</p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {showCamera && isReady && (
-          <div className="mt-4 text-center">
-            {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
-            <p className="text-gray-400 text-sm">
-              Show <span className="text-green-400 font-medium">OK sign</span> to generate
-              &nbsp;&middot;&nbsp;
-              Show <span className="text-green-400 font-medium">open palm</span> to go back
-            </p>
-          </div>
-        )}
-
-        {(appState === AppState.SCRIPT_LOADING || appState === AppState.COMIC_GENERATING) && (
-          <div className="flex flex-col items-center justify-center py-16 gap-4">
-            {error ? (
-              <ErrorDisplay
-                message={error}
-                onRetry={
-                  appState === AppState.SCRIPT_LOADING
-                    ? goHome
-                    : handleGenerateComic
-                }
-                retryText="Retry"
+          <PageTransition>
+            <div className="relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden glass-panel">
+              <CameraView
+                videoRef={videoRef}
+                canvasRef={canvasRef}
+                className={`w-full h-full ${isReady ? '' : 'invisible'}`}
               />
-            ) : (
-              <>
-                <LoadingSpinner />
-                <p className="text-gray-400 text-lg">
-                  {appState === AppState.SCRIPT_LOADING
-                    ? 'Creating something fun...'
-                    : 'Drawing your comic...'}
-                </p>
-              </>
-            )}
-          </div>
+              {!isReady && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                  {cameraError ? (
+                    <ErrorDisplay message={cameraError} onRetry={restartCamera} retryText="Restart Camera" />
+                  ) : (
+                    <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      Starting camera...
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="mt-5 text-center">
+              {error && (
+                <p className="text-sm mb-2" style={{ color: 'rgba(255,183,77,0.6)' }}>{error}</p>
+              )}
+              <p className="text-[11px] tracking-[0.1em] font-display" style={{ color: 'rgba(255,183,77,0.35)' }}>
+                Show OK sign to generate · Open palm to go back
+              </p>
+            </div>
+          </PageTransition>
         )}
 
+        {/* SCRIPT_LOADING / COMIC_GENERATING */}
+        {(appState === AppState.SCRIPT_LOADING || appState === AppState.COMIC_GENERATING) && (
+          <PageTransition>
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              {error ? (
+                <ErrorDisplay
+                  message={error}
+                  onRetry={appState === AppState.SCRIPT_LOADING ? goHome : handleGenerateComic}
+                  retryText="Retry"
+                />
+              ) : (
+                <LoadingOrb
+                  label={appState === AppState.SCRIPT_LOADING ? 'CREATING' : 'DRAWING'}
+                  subtext={
+                    appState === AppState.SCRIPT_LOADING
+                      ? '寻找一个有趣的俚语...'
+                      : '绘制你的漫画...'
+                  }
+                />
+              )}
+            </div>
+          </PageTransition>
+        )}
+
+        {/* SCRIPT_PREVIEW */}
         {appState === AppState.SCRIPT_PREVIEW && scriptData && (
-          <ScriptPreview
-            data={scriptData}
-            onShuffle={handleGenerateScript}
-            onGenerate={handleGenerateComic}
-            isLoading={false}
-          />
+          <PageTransition>
+            <ScriptPreview
+              data={scriptData}
+              onShuffle={handleGenerateScript}
+              onGenerate={handleGenerateComic}
+              isLoading={false}
+            />
+          </PageTransition>
         )}
 
+        {/* COMIC_READY */}
         {appState === AppState.COMIC_READY && (
-          <ComicDisplay
-            comicUrl={comicUrl}
-            slang={scriptData?.slang ?? ''}
-            onNew={goHome}
-            onGoToHistory={goHistory}
-          />
+          <PageTransition>
+            <ComicDisplay
+              comicUrl={comicUrl}
+              slang={scriptData?.slang ?? ''}
+              onNew={goHome}
+            />
+          </PageTransition>
         )}
 
-        {appState === AppState.HISTORY && (
-          <HistoryList
-            items={historyItems}
-            isLoading={historyLoading}
-            error={error}
-            onRetry={fetchHistory}
-            onBack={goHome}
-          />
+        {/* HISTORY */}
+        {isHistory && (
+          <PageTransition>
+            <HistoryList
+              items={historyItems}
+              isLoading={historyLoading}
+              error={error}
+              onRetry={fetchHistory}
+              onBack={goHome}
+            />
+          </PageTransition>
         )}
       </main>
     </div>

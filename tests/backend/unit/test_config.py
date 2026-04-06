@@ -32,7 +32,7 @@ class TestDefaultValues:
         assert s.debug is False
         assert s.app_name == "SlangToon"
         assert s.app_version == "1.0.0"
-        assert s.vision_llm_timeout == 90
+        assert s.vision_llm_timeout == 120
         assert s.vision_llm_max_retries == 2
         assert s.qwen_image_timeout == 120
         assert s.max_history_records == 1000

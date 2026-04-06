@@ -21,8 +21,8 @@ test.describe('Backend API Integration', () => {
     expect(body.data.slang).toBeTruthy();
     expect(body.data.origin).toBeTruthy();
     expect(body.data.explanation).toBeTruthy();
-    expect(body.data.panel_count).toBeGreaterThanOrEqual(4);
-    expect(body.data.panel_count).toBeLessThanOrEqual(6);
+    expect(body.data.panel_count).toBeGreaterThanOrEqual(8);
+    expect(body.data.panel_count).toBeLessThanOrEqual(12);
     expect(body.data.panels).toHaveLength(body.data.panel_count);
     expect(body.data.panels[0]).toHaveProperty('scene');
     expect(body.data.panels[0]).toHaveProperty('dialogue');
@@ -100,8 +100,8 @@ test.describe('Error Handling', () => {
   test('generate-comic with invalid panel_count returns validation error', async ({ page }) => {
     const invalidData = {
       ...mockScriptData,
-      panel_count: 10,
-      panels: Array(10).fill({ scene: 'test', dialogue: '' }),
+      panel_count: 2,
+      panels: Array(2).fill({ scene: 'test', dialogue: '' }),
     };
     const resp = await page.request.post('http://localhost:8888/api/generate-comic', {
       data: invalidData,

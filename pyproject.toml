@@ -13,6 +13,8 @@ dependencies = [
     "python-multipart>=0.0.9",
     "langsmith>=0.1.0",
     "tiktoken>=0.7.0",
+    "langgraph>=1.1.6",
+    "langchain-core>=1.2.26",
 ]
 
 [dependency-groups]

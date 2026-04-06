@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import type { HistoryItem } from '../../types';
+import LoadingOrb from '../LoadingOrb';
+import GlassButton from '../GlassButton';
 
 interface HistoryListProps {
   items: HistoryItem[];
@@ -7,7 +9,6 @@ interface HistoryListProps {
   error?: string | null;
   onRetry?: () => void;
   onBack?: () => void;
-  onSelectItem?: (item: HistoryItem) => void;
 }
 
 function formatDate(dateStr: string): string {
@@ -31,14 +32,8 @@ export default function HistoryList({
   error = null,
   onRetry,
   onBack,
-  onSelectItem,
 }: HistoryListProps) {
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
-
-  const handleSelectItem = (item: HistoryItem) => {
-    setSelectedItem(item);
-    onSelectItem?.(item);
-  };
 
   const handleBack = () => {
     if (selectedItem) {
@@ -48,154 +43,105 @@ export default function HistoryList({
     }
   };
 
-  // Full comic view
+  // Detail view
   if (selectedItem) {
     return (
-      <div className="flex flex-col items-center gap-4 w-full max-w-2xl mx-auto">
-        {/* Back button */}
+      <div
+        className="flex flex-col items-center gap-5 w-full max-w-2xl mx-auto px-6 py-4"
+        style={{ animation: 'fade-scale-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+      >
         <button
           onClick={handleBack}
-          className="self-start px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
+          className="self-start text-[11px] tracking-[0.15em] font-display cursor-pointer"
+          style={{ color: 'rgba(255,183,77,0.4)' }}
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back to list
+          ← Back to list
         </button>
 
-        {/* Full comic image */}
-        <img
-          src={selectedItem.comic_url}
-          alt={`Comic for "${selectedItem.slang}"`}
-          className="w-full rounded-xl border border-gray-700"
-        />
+        <div className="w-full rounded-xl overflow-hidden gold-border gold-glow">
+          <img
+            src={selectedItem.comic_url}
+            alt={`Comic for "${selectedItem.slang}"`}
+            className="w-full h-auto"
+          />
+        </div>
 
-        {/* Comic info */}
         <div className="text-center">
-          <p className="text-gray-300 font-medium">
-            &quot;{selectedItem.slang}&quot;
+          <p className="font-accent italic text-lg" style={{ color: '#FFF3E0' }}>
+            &ldquo;{selectedItem.slang}&rdquo;
           </p>
-          <p className="text-gray-400 text-sm mt-1">
-            Origin: <span className="text-gray-300">{selectedItem.origin}</span>
-            &nbsp;&middot;&nbsp;
-            {selectedItem.panel_count} panels
-          </p>
-          <p className="text-gray-500 text-xs mt-1">
-            {formatDate(selectedItem.created_at)}
+          <p className="text-[10px] mt-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            {selectedItem.origin} · {selectedItem.panel_count} panels · {formatDate(selectedItem.created_at)}
           </p>
         </div>
       </div>
     );
   }
 
-  // Loading state
+  // Loading
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <div className="h-10 w-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-gray-400 mt-3">Loading history...</p>
+        <LoadingOrb label="LOADING" subtext="Loading history..." />
       </div>
     );
   }
 
-  // Error state
+  // Error
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-16">
-        <p className="text-red-400 mb-4">{error}</p>
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>{error}</p>
         {onRetry && (
-          <button
-            onClick={onRetry}
-            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
-          >
-            Retry
-          </button>
+          <GlassButton onClick={onRetry}>Retry</GlassButton>
         )}
       </div>
     );
   }
 
+  // Grid view
   return (
-    <div className="flex flex-col gap-6 w-full">
-      {/* Header with back button */}
-      <div className="flex items-center gap-4">
-        {onBack && (
-          <button
-            onClick={handleBack}
-            className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-          </button>
-        )}
-        <h2 className="text-2xl font-bold text-white">History</h2>
-      </div>
-
+    <div
+      className="flex flex-col gap-6 w-full px-6 py-4"
+      style={{ animation: 'fade-scale-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+    >
       {/* Empty state */}
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <svg
-            className="h-16 w-16 text-gray-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1}
+          <div
+            className="w-12 h-12 rounded-full flex items-center justify-center"
+            style={{ border: '1px solid rgba(255,183,77,0.15)' }}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-            />
-          </svg>
-          <p className="text-gray-500 text-lg">No history yet</p>
-          <p className="text-gray-600 text-sm">Your generated comics will appear here</p>
+            <span style={{ color: 'rgba(255,183,77,0.3)' }}>○</span>
+          </div>
+          <p className="text-sm font-display tracking-wider" style={{ color: 'rgba(255,183,77,0.4)' }}>
+            No history yet
+          </p>
+          <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>
+            Your generated comics will appear here
+          </p>
         </div>
       ) : (
-        /* History items grid */
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
           {items.map((item) => (
             <button
               key={item.id}
-              onClick={() => handleSelectItem(item)}
-              className="group flex flex-col gap-2 rounded-xl overflow-hidden border border-gray-700 hover:border-gray-500 bg-gray-800/50 transition-all hover:scale-[1.02]"
+              onClick={() => setSelectedItem(item)}
+              className="group flex flex-col gap-2 rounded-xl overflow-hidden glass-panel transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
             >
-              {/* Thumbnail */}
               <div className="aspect-[3/4] overflow-hidden">
                 <img
                   src={item.thumbnail_url || item.comic_url}
                   alt={item.slang}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                 />
               </div>
-
-              {/* Info */}
               <div className="px-3 pb-3 text-left">
-                <p className="text-sm font-medium text-yellow-400 truncate">
-                  &quot;{item.slang}&quot;
+                <p className="text-xs truncate" style={{ color: 'rgba(255,183,77,0.6)' }}>
+                  &ldquo;{item.slang}&rdquo;
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {item.panel_count} panels &middot; {formatDate(item.created_at)}
+                <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                  {item.panel_count} panels · {formatDate(item.created_at)}
                 </p>
               </div>
             </button>

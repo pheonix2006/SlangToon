@@ -27,6 +27,9 @@ def tmp_data_dir(tmp_path):
     (data_dir / "traces").mkdir()
     os.environ["TRACE_DIR"] = str(data_dir / "traces")
     os.environ["TRACE_ENABLED"] = "true"
+    # Clear cached settings so new env vars take effect
+    from app.dependencies import get_cached_settings
+    get_cached_settings.cache_clear()
     yield data_dir
 
 
@@ -47,7 +50,7 @@ def mock_script_data():
         "slang": "Break a leg",
         "origin": "Western theater tradition",
         "explanation": "Used to wish good luck before a performance",
-        "panel_count": 4,
+        "panel_count": 8,
         "panels": [
             {
                 "scene": "A nervous actor paces backstage, clutching a crumpled script. The stage manager glances at the clock.",
@@ -65,6 +68,22 @@ def mock_script_data():
                 "scene": "Standing ovation! Confetti falls. The actor beams with joy and happy tears.",
                 "dialogue": 'Narrator: "Break a leg indeed."',
             },
+            {
+                "scene": "The actor bows gracefully as the curtain begins to close.",
+                "dialogue": "",
+            },
+            {
+                "scene": "Backstage, the cast celebrates with a group hug.",
+                "dialogue": 'Director: "Incredible!"',
+            },
+            {
+                "scene": "The actor looks at the crumpled script, now smoothed out and signed by the cast.",
+                "dialogue": "",
+            },
+            {
+                "scene": "The actor walks out of the theater into the night, smiling under the marquee lights.",
+                "dialogue": 'Narrator: "And that\'s how you break a leg."',
+            },
         ],
     }
 
@@ -78,7 +97,7 @@ def mock_script_response_text(mock_script_data):
 @pytest.fixture
 def mock_comic_prompt():
     """Mock visual prompt for Qwen Image 2.0."""
-    return "A 4-panel horizontal comic strip in manga style, 16:9 layout. Panel 1: A nervous actor paces backstage holding a crumpled script. Panel 2: Friends give thumbs up. Panel 3: Actor steps onto spotlight stage. Panel 4: Standing ovation with confetti. Speech bubbles with dialogue. Clean line art, warm color palette."
+    return "A 8-panel layout (2 rows x 4 columns grid) comic strip in manga style, 16:9 layout. Panel 1: A nervous actor paces backstage. Panel 2: Friends give thumbs up. Panel 3: Actor steps onto spotlight stage. Panel 4: Standing ovation. Panel 5: Curtain closes. Panel 6: Cast celebrates. Panel 7: Signed script. Panel 8: Actor under marquee. Speech bubbles with dialogue. Clean line art, warm color palette."
 
 
 @pytest.fixture
@@ -92,5 +111,5 @@ def mock_image_gen_b64():
 @pytest.fixture
 def trace_store(tmp_data_dir):
     """创建临时 TraceStore 实例。"""
-    from app.flow_log.trace_store import TraceStore
+    from app.graphs.trace_store import TraceStore
     return TraceStore(str(tmp_data_dir / "traces"), retention_days=7)

@@ -95,7 +95,7 @@ class TestAdd:
             "slang": "Break a leg",
             "origin": "Western theater tradition",
             "explanation": "Used to wish good luck",
-            "panel_count": 4,
+            "panel_count": 8,
             "comic_prompt": "A comic strip about wishing good luck before a stage performance...",
             "comic_url": "/data/comics/x.png",
             "thumbnail_url": "/data/comics/x_thumb.png",
@@ -176,7 +176,7 @@ class TestGetPage:
             "slang": "Break a leg",
             "origin": "Western theater tradition",
             "explanation": "Used to wish good luck",
-            "panel_count": 4,
+            "panel_count": 8,
             "comic_prompt": "A comic strip about wishing good luck before a stage performance...",
             "comic_url": "/data/comics/x.png",
             "thumbnail_url": "/data/comics/x_thumb.png",
@@ -189,7 +189,7 @@ class TestGetPage:
         assert item["slang"] == "Break a leg"
         assert item["origin"] == "Western theater tradition"
         assert item["explanation"] == "Used to wish good luck"
-        assert item["panel_count"] == 4
+        assert item["panel_count"] == 8
         assert item["comic_prompt"] == "A comic strip about wishing good luck before a stage performance..."
         assert item["comic_url"] == "/data/comics/x.png"
         assert item["thumbnail_url"] == "/data/comics/x_thumb.png"

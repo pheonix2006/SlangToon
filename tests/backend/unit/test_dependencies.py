@@ -1,4 +1,4 @@
-"""get_cached_settings 和 get_trace_store 依赖函数的单元测试。"""
+"""Unit tests for get_cached_settings and get_trace_store dependencies."""
 
 from __future__ import annotations
 
@@ -6,17 +6,16 @@ import pytest
 
 from app.config import Settings
 from app.dependencies import get_cached_settings, get_trace_store
-from app.flow_log.trace_store import TraceStore
+from app.graphs.trace_store import TraceStore
 
 
 class TestGetCachedSettings:
-    """验证 get_cached_settings 的行为。"""
+    """Verify get_cached_settings behavior."""
 
     def test_returns_settings_instance(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OPENAI_API_KEY", "test")
-        # 需要清除 lru_cache，确保每次测试都干净
         get_cached_settings.cache_clear()
 
         result = get_cached_settings()
@@ -34,7 +33,7 @@ class TestGetCachedSettings:
 
 
 class TestGetTraceStore:
-    """验证 get_trace_store 依赖函数的行为。"""
+    """Verify get_trace_store dependency behavior."""
 
     def test_returns_trace_store_instance(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: object
@@ -57,5 +56,5 @@ class TestGetTraceStore:
         settings = get_cached_settings()
 
         store = get_trace_store(settings)
-        assert store.trace_dir == tmp_path
-        assert store.retention_days == 14
+        assert str(store._trace_dir) == str(tmp_path)
+        assert store._retention_days == 14

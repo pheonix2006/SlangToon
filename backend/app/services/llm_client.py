@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import httpx
 
 from app.config import Settings
+from langsmith import traceable
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ class LLMClient:
     # 公开方法
     # ------------------------------------------------------------------
 
+    @traceable(run_type="llm", name="glm_chat_with_vision")
     async def chat_with_vision(
         self,
         system_prompt: str,
@@ -158,6 +160,7 @@ class LLMClient:
             f"Vision 请求在 {self._max_retries} 次重试后仍然失败"
         ) from last_exc
 
+    @traceable(run_type="llm", name="glm_chat")
     async def chat(
         self,
         system_prompt: str,

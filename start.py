@@ -14,6 +14,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+# 在启动任何子进程之前，将 .env 加载到 os.environ。
+# 确保 LANGSMITH_TRACING / LANGSMITH_API_KEY / LANGSMITH_PROJECT
+# 在 uvicorn 子工作进程中可见（@traceable 装饰器从 os.environ 读取）。
+from dotenv import load_dotenv
+_env_file = Path(__file__).resolve().parent / ".env"
+if _env_file.exists():
+    load_dotenv(_env_file, override=False)
+
 PROJECT_ROOT = Path(__file__).parent.resolve()
 BACKEND_DIR = PROJECT_ROOT / "backend"
 FRONTEND_DIR = PROJECT_ROOT / "frontend"

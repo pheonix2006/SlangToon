@@ -8,6 +8,7 @@ import logging
 import httpx
 
 from app.config import Settings
+from langsmith import traceable
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +145,8 @@ class ImageGenClient:
                         last_exc = ImageGenApiError(
                             f"图像生成 API 服务端错误 {resp.status_code}: {resp.text[:500]}"
                         )
-                        logger.warning(
-                            "图像生成 5xx (attempt %d/%d): %s",
+                        logger.debug(
+                            "图生图 5xx (第 %d/%d 次): %s",
                             attempt, self._max_retries, repr(last_exc),
                         )
                         if attempt < self._max_retries:
@@ -176,8 +177,8 @@ class ImageGenClient:
 
             except httpx.ConnectError as exc:
                 last_exc = exc
-                logger.warning(
-                    "图像生成连接错误 (attempt %d/%d): %s",
+                logger.debug(
+                    "图生图连接错误 (第 %d/%d 次): %s",
                     attempt, self._max_retries, repr(exc),
                 )
                 if attempt < self._max_retries:
@@ -185,8 +186,8 @@ class ImageGenClient:
 
             except Exception as exc:
                 last_exc = exc
-                logger.warning(
-                    "图像生成请求异常 (attempt %d/%d): %s",
+                logger.debug(
+                    "图生图请求异常 (第 %d/%d 次): %s",
                     attempt, self._max_retries, repr(exc),
                 )
                 if attempt < self._max_retries:
@@ -196,10 +197,11 @@ class ImageGenClient:
             f"图像生成请求在 {self._max_retries} 次重试后仍然失败"
         ) from last_exc
 
+    @traceable(run_type="tool", name="qwen_image_gen")
     async def generate_from_text(
         self,
         prompt: str,
-        size: str = "2688*1536",
+        size: str = "1536*2688",
     ) -> str:
         """Text-to-image — generate image from text prompt only.
 
@@ -242,8 +244,8 @@ class ImageGenClient:
                         last_exc = ImageGenApiError(
                             f"文本生图 API 服务端错误 {resp.status_code}: {resp.text[:500]}"
                         )
-                        logger.warning(
-                            "文本生图 5xx (attempt %d/%d): %s",
+                        logger.debug(
+                            "文本生图 5xx (第 %d/%d 次): %s",
                             attempt, self._max_retries, repr(last_exc),
                         )
                         if attempt < self._max_retries:
@@ -273,8 +275,8 @@ class ImageGenClient:
 
             except httpx.ConnectError as exc:
                 last_exc = exc
-                logger.warning(
-                    "文本生图连接错误 (attempt %d/%d): %s",
+                logger.debug(
+                    "文本生图连接错误 (第 %d/%d 次): %s",
                     attempt, self._max_retries, repr(exc),
                 )
                 if attempt < self._max_retries:
@@ -282,8 +284,8 @@ class ImageGenClient:
 
             except Exception as exc:
                 last_exc = exc
-                logger.warning(
-                    "文本生图请求异常 (attempt %d/%d): %s",
+                logger.debug(
+                    "文本生图请求异常 (第 %d/%d 次): %s",
                     attempt, self._max_retries, repr(exc),
                 )
                 if attempt < self._max_retries:
@@ -312,13 +314,22 @@ class ImageGenClient:
     async def _download_as_base64(self, image_url: str) -> str:
         """下载远程图片并转为 base64 字符串。"""
         logger.info("下载生成图片: %s", image_url[:100])
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            resp = await client.get(image_url)
-            resp.raise_for_status()
-            content_type = resp.headers.get("content-type", "image/png")
-            b64 = base64.b64encode(resp.content).decode("ascii")
-            logger.info("图片下载完成 (size=%d bytes)", len(resp.content))
-            return f"data:{content_type};base64,{b64}"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.get(image_url)
+                resp.raise_for_status()
+                content_type = resp.headers.get("content-type", "image/png")
+                b64 = base64.b64encode(resp.content).decode("ascii")
+                logger.info("图片下载完成 (size=%d bytes)", len(resp.content))
+                return f"data:{content_type};base64,{b64}"
+        except httpx.HTTPStatusError as exc:
+            raise ImageGenApiError(
+                f"图片下载失败 (HTTP {exc.response.status_code}): {exc.response.text[:200]}"
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise ImageGenTimeoutError(
+                f"图片下载超时 ({self._timeout}s)"
+            ) from exc
 
     @staticmethod
     async def _backoff(attempt: int, base: float = 1.0) -> None:

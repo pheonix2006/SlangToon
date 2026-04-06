@@ -12,7 +12,7 @@ export async function mockScriptAPI(page: Page) {
           slang: 'Break a leg',
           origin: 'Western theater tradition',
           explanation: 'Used to wish good luck before a performance, ironically hoping the show is so successful that actors must bow so much their legs break.',
-          panel_count: 4,
+          panel_count: 8,
           panels: [
             {
               scene: 'A nervous actor paces backstage, clutching a crumpled script. The stage manager glances at the clock.',
@@ -29,6 +29,22 @@ export async function mockScriptAPI(page: Page) {
             {
               scene: 'Standing ovation! Confetti falls. The actor beams with joy and happy tears.',
               dialogue: 'Narrator: "Break a leg indeed."',
+            },
+            {
+              scene: 'The actor bows gracefully as the curtain begins to close.',
+              dialogue: '',
+            },
+            {
+              scene: 'Backstage, the cast celebrates with a group hug.',
+              dialogue: 'Director: "Incredible!"',
+            },
+            {
+              scene: 'The actor looks at the crumpled script, now smoothed out and signed by the cast.',
+              dialogue: '',
+            },
+            {
+              scene: 'The actor walks out of the theater into the night, smiling under the marquee lights.',
+              dialogue: 'Narrator: "And that\'s how you break a leg."',
             },
           ],
         },
@@ -70,10 +86,10 @@ export async function mockHistoryAPI(page: Page) {
               slang: 'Break a leg',
               origin: 'Western theater tradition',
               explanation: 'Used to wish good luck before a performance.',
-              panel_count: 4,
+              panel_count: 8,
               comic_url: '/data/comics/comic1.png',
               thumbnail_url: '/data/comics/thumb1.png',
-              comic_prompt: 'A 4-panel comic about theater...',
+              comic_prompt: 'A 8-panel comic about theater...',
               created_at: '2026-03-29T10:00:00',
             },
           ],
@@ -92,7 +108,7 @@ export const mockScriptData = {
   slang: 'Break a leg',
   origin: 'Western theater tradition',
   explanation: 'Used to wish good luck before a performance.',
-  panel_count: 4,
+  panel_count: 8,
   panels: [
     {
       scene: 'A nervous actor paces backstage, clutching a crumpled script.',
@@ -109,6 +125,22 @@ export const mockScriptData = {
     {
       scene: 'Standing ovation! Confetti falls.',
       dialogue: 'Narrator: "Break a leg indeed."',
+    },
+    {
+      scene: 'The actor bows gracefully as the curtain begins to close.',
+      dialogue: '',
+    },
+    {
+      scene: 'Backstage, the cast celebrates with a group hug.',
+      dialogue: 'Director: "Incredible!"',
+    },
+    {
+      scene: 'The actor looks at the crumpled script, now smoothed out and signed by the cast.',
+      dialogue: '',
+    },
+    {
+      scene: 'The actor walks out of the theater into the night, smiling under the marquee lights.',
+      dialogue: 'Narrator: "And that\'s how you break a leg."',
     },
   ],
 };

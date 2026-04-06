@@ -12,26 +12,13 @@ class TestScriptData:
             slang="Break a leg",
             origin="Western theater tradition",
             explanation="Used to wish good luck",
-            panel_count=4,
-            panels=[
-                Panel(scene="A nervous actor", dialogue='Narrator: Opening night...'),
-                Panel(scene="Friends cheer", dialogue='Friend: You got this!'),
-                Panel(scene="Actor on stage", dialogue=""),
-                Panel(scene="Standing ovation", dialogue=""),
-            ],
+            panel_count=8,
+            panels=[Panel(scene="A scene", dialogue="")] * 8,
         )
         assert data.slang == "Break a leg"
-        assert len(data.panels) == 4
+        assert len(data.panels) == 8
 
-    def test_rejects_panel_count_below_4(self):
-        with pytest.raises(ValidationError):
-            ScriptData(
-                slang="test", origin="test", explanation="test",
-                panel_count=3,
-                panels=[Panel(scene="x")] * 3,
-            )
-
-    def test_rejects_panel_count_above_6(self):
+    def test_rejects_panel_count_below_8(self):
         with pytest.raises(ValidationError):
             ScriptData(
                 slang="test", origin="test", explanation="test",
@@ -39,12 +26,20 @@ class TestScriptData:
                 panels=[Panel(scene="x")] * 7,
             )
 
+    def test_rejects_panel_count_above_12(self):
+        with pytest.raises(ValidationError):
+            ScriptData(
+                slang="test", origin="test", explanation="test",
+                panel_count=13,
+                panels=[Panel(scene="x")] * 13,
+            )
+
     def test_panel_count_mismatch_with_list_length(self):
         with pytest.raises(ValidationError):
             ScriptData(
                 slang="test", origin="test", explanation="test",
-                panel_count=4,
-                panels=[Panel(scene="x")] * 3,
+                panel_count=8,
+                panels=[Panel(scene="x")] * 7,
             )
 
 
@@ -60,24 +55,24 @@ class TestScriptRequest:
 
 class TestComicRequest:
     def test_valid_request(self):
-        panels = [Panel(scene="test", dialogue="")] * 4
+        panels = [Panel(scene="test", dialogue="")] * 8
         req = ComicRequest(
             slang="Break a leg", origin="Western", explanation="Good luck",
-            panel_count=4, panels=panels,
+            panel_count=8, panels=panels,
         )
         assert req.slang == "Break a leg"
 
     def test_missing_panels_raises(self):
         with pytest.raises(ValidationError):
-            ComicRequest(slang="test", origin="test", explanation="test", panel_count=4, panels=[])
+            ComicRequest(slang="test", origin="test", explanation="test", panel_count=8, panels=[])
 
 
 class TestHistoryItem:
     def test_valid_item(self):
         item = HistoryItem(
             id="abc", slang="Break a leg", origin="Western",
-            explanation="Good luck", panel_count=4,
+            explanation="Good luck", panel_count=8,
             comic_url="/data/comics/x.png", thumbnail_url="/data/comics/x_thumb.png",
-            comic_prompt="A 4-panel comic...", created_at="2026-04-01T00:00:00Z",
+            comic_prompt="A 8-panel comic...", created_at="2026-04-01T00:00:00Z",
         )
         assert item.slang == "Break a leg"

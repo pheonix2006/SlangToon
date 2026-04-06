@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 from pydantic import BaseModel
 
 
@@ -6,14 +6,7 @@ class ApiResponse(BaseModel):
     """统一响应信封"""
     code: int = 0
     message: str = "success"
-    data: Optional[Any] = None
-
-
-class ErrorResponse(BaseModel):
-    """错误响应"""
-    code: int
-    message: str
-    data: Optional[Any] = None
+    data: Any | None = None
 
 
 class ErrorCode:

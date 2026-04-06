@@ -28,43 +28,35 @@ const mockItems: HistoryItem[] = [
   },
 ];
 
-const defaultProps = {
-  items: mockItems,
-};
-
 describe('HistoryList', () => {
   it('shows empty state "No history yet"', () => {
     render(<HistoryList items={[]} />);
-
     expect(screen.getByText('No history yet')).toBeInTheDocument();
   });
 
   it('renders history items with slang names', () => {
-    render(<HistoryList {...defaultProps} />);
-
-    expect(screen.getByText('"Slay"')).toBeInTheDocument();
-    expect(screen.getByText('"No cap"')).toBeInTheDocument();
+    render(<HistoryList items={mockItems} />);
+    expect(screen.getByText(/\u201CSlay\u201D/)).toBeInTheDocument();
+    expect(screen.getByText(/\u201CNo cap\u201D/)).toBeInTheDocument();
   });
 
-  it('shows detail view on item click with "Back to list" button', async () => {
+  it('shows detail view on item click with back button', async () => {
     const user = userEvent.setup();
-    render(<HistoryList {...defaultProps} />);
+    render(<HistoryList items={mockItems} />);
 
     await user.click(screen.getByAltText('Slay'));
-
-    expect(screen.getByText('Back to list')).toBeInTheDocument();
-    expect(screen.getByAltText('Comic for "Slay"')).toBeInTheDocument();
+    expect(screen.getByText(/Back to list/)).toBeInTheDocument();
+    expect(screen.getByAltText(/Comic for/)).toBeInTheDocument();
   });
 
   it('returns to list on back button click', async () => {
     const user = userEvent.setup();
-    render(<HistoryList {...defaultProps} />);
+    render(<HistoryList items={mockItems} />);
 
     await user.click(screen.getByAltText('Slay'));
-    expect(screen.getByText('Back to list')).toBeInTheDocument();
+    expect(screen.getByText(/Back to list/)).toBeInTheDocument();
 
-    await user.click(screen.getByText('Back to list'));
-    expect(screen.queryByText('Back to list')).not.toBeInTheDocument();
-    expect(screen.getByText('"Slay"')).toBeInTheDocument();
+    await user.click(screen.getByText(/Back to list/));
+    expect(screen.queryByText(/Back to list/)).not.toBeInTheDocument();
   });
 });

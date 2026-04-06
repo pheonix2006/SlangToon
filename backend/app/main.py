@@ -16,10 +16,9 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     Path(settings.comic_storage_dir).mkdir(parents=True, exist_ok=True)
     Path(settings.history_file).parent.mkdir(parents=True, exist_ok=True)
-    # Trace cleanup on startup
     if settings.trace_enabled:
         Path(settings.trace_dir).mkdir(parents=True, exist_ok=True)
-        from app.flow_log.trace_store import TraceStore
+        from app.graphs.trace_store import TraceStore
         TraceStore(settings.trace_dir, settings.trace_retention_days).cleanup()
     yield
 
@@ -49,12 +48,12 @@ def create_app() -> FastAPI:
     app.include_router(comic.router)
     app.include_router(history.router)
     app.include_router(traces.router)
+
+    @app.get("/health")
+    async def health_check():
+        return {"status": "ok", "app": "SlangToon"}
+
     return app
 
 
 app = create_app()
-
-
-@app.get("/health")
-async def health_check():
-    return {"status": "ok", "app": "SlangToon"}

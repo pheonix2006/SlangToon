@@ -97,8 +97,8 @@ def test_generate_script(client: httpx.Client) -> dict:
         if not data.get(field):
             log_fail(f"Missing field: {field}")
 
-    if not isinstance(panel_count, int) or not (4 <= panel_count <= 6):
-        log_fail(f"panel_count out of range [4,6]: {panel_count}")
+    if not isinstance(panel_count, int) or not (8 <= panel_count <= 12):
+        log_fail(f"panel_count out of range [8,12]: {panel_count}")
     else:
         log_pass(f"panel_count valid: {panel_count}")
 
@@ -278,15 +278,15 @@ def test_generate_comic_validation_errors(client: httpx.Client):
             "slang": "test",
             "origin": "test",
             "explanation": "test",
-            "panel_count": 10,
+            "panel_count": 2,
             "panels": [{"scene": "test", "dialogue": ""}],
         },
         timeout=10,
     )
     if resp.status_code == 422:
-        log_pass("panel_count=10 correctly rejected (422)")
+        log_pass("panel_count=2 correctly rejected (422)")
     else:
-        log_fail(f"panel_count=10 should be rejected, got {resp.status_code}")
+        log_fail(f"panel_count=2 should be rejected, got {resp.status_code}")
 
 
 def test_health_app_name(client: httpx.Client):
