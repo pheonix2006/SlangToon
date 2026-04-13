@@ -7,7 +7,7 @@ export const API_ENDPOINTS = {
 } as const;
 
 export const TIMEOUTS = {
-  SCRIPT_REQUEST: 200_000,
+  SCRIPT_REQUEST: 360_000, // 6 min — 匹配后端 LLM 超时 300s + 余量
   COMIC_REQUEST: 400_000,
   HISTORY_REQUEST: 10_000,
 } as const;

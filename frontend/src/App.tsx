@@ -4,7 +4,7 @@ import type { GestureType, ScriptData, HistoryItem } from './types';
 import { useCamera } from './hooks/useCamera';
 import { useGestureDetector } from './hooks/useGestureDetector';
 import { useMediaPipeHands } from './hooks/useMediaPipeHands';
-import { generateScript, generateComic, getHistory } from './services/api';
+import { generateScript, generateComic, getHistory, fetchConfig } from './services/api';
 import GlowBackground from './components/GlowBackground/GlowBackground';
 import PageTransition from './components/PageTransition';
 import CameraView from './components/CameraView/CameraView';
@@ -28,6 +28,11 @@ function App() {
   useEffect(() => {
     appStateRef.current = appState;
   }, [appState]);
+
+  // ── Fetch backend config (timeouts) ──
+  useEffect(() => {
+    fetchConfig();
+  }, []);
 
   // ── Navigation ──
   const goHome = useCallback(() => {
@@ -157,7 +162,8 @@ function App() {
   }, [appState]);
 
   // ── Render ──
-  // Camera must stay alive in GALLERY mode so MediaPipe can detect wave gestures
+  // Camera must stay mounted (not just alive in GALLERY) — CSS-hidden when unused
+  // so the <video> element is never unmounted, preserving the stream + MediaPipe loop
   const showCamera = appState === AppState.CAMERA_READY || appState === AppState.GALLERY;
   const isHistory = appState === AppState.HISTORY;
 
@@ -209,8 +215,11 @@ function App() {
           ? 'justify-start'
           : 'justify-center'
       }`}>
-        {/* CAMERA_READY / GALLERY (camera stays alive for gesture detection) */}
-        {showCamera && (
+        {/* Camera always mounted — CSS-hidden when not needed to keep stream + MediaPipe alive */}
+        <div
+          className={!showCamera ? 'absolute w-0 h-0 overflow-hidden opacity-0 pointer-events-none' : undefined}
+          aria-hidden={!showCamera}
+        >
           <PageTransition>
             <div className={`relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden glass-panel ${
               appState === AppState.GALLERY ? 'absolute opacity-0 pointer-events-none w-0 h-0 overflow-hidden' : ''
@@ -243,7 +252,7 @@ function App() {
               </div>
             )}
           </PageTransition>
-        )}
+        </div>
 
         {/* SCRIPT_LOADING / COMIC_GENERATING */}
         {(appState === AppState.SCRIPT_LOADING || appState === AppState.COMIC_GENERATING) && (

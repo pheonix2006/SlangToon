@@ -1,6 +1,43 @@
 import type { ScriptResponse, ComicResponse, HistoryResponse } from '../types';
 import { API_BASE_URL, API_ENDPOINTS, TIMEOUTS } from '../constants';
 
+// ---------------------------------------------------------------------------
+// 动态超时配置（从后端 /api/config 获取，失败时使用默认值）
+// ---------------------------------------------------------------------------
+
+/** 后端超时秒数 + 60s 缓冲 → 前端 fetch 超时毫秒数 */
+const BUFFER_MS = 60_000;
+
+const dynamicTimeouts = {
+  script: TIMEOUTS.SCRIPT_REQUEST,
+  comic: TIMEOUTS.COMIC_REQUEST,
+};
+
+export async function fetchConfig(): Promise<void> {
+  try {
+    const resp = await fetch(`${API_BASE_URL}/api/config`, {
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!resp.ok) return;
+    const cfg = await resp.json() as {
+      script_timeout_s: number;
+      comic_timeout_s: number;
+    };
+    if (cfg.script_timeout_s) {
+      dynamicTimeouts.script = cfg.script_timeout_s * 1000 + BUFFER_MS;
+    }
+    if (cfg.comic_timeout_s) {
+      dynamicTimeouts.comic = cfg.comic_timeout_s * 1000 + BUFFER_MS;
+    }
+  } catch {
+    // 获取失败时保持默认值
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Error handling
+// ---------------------------------------------------------------------------
+
 class ApiError extends Error {
   constructor(
     message: string,
@@ -85,6 +122,10 @@ async function request<T>(
   }
 }
 
+// ---------------------------------------------------------------------------
+// API functions
+// ---------------------------------------------------------------------------
+
 export async function generateScript(): Promise<ScriptResponse> {
   return request<ScriptResponse>(
     API_ENDPOINTS.GENERATE_SCRIPT,
@@ -93,7 +134,7 @@ export async function generateScript(): Promise<ScriptResponse> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     },
-    TIMEOUTS.SCRIPT_REQUEST,
+    dynamicTimeouts.script,
   );
 }
 
@@ -113,7 +154,7 @@ export async function generateComic(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(scriptData),
     },
-    TIMEOUTS.COMIC_REQUEST,
+    dynamicTimeouts.comic,
   );
 }
 

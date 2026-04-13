@@ -1,11 +1,11 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.logging_config import setup_logging
 from app.middleware import RequestIdMiddleware
 from app.routers import script, comic, history, traces
@@ -52,6 +52,14 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check():
         return {"status": "ok", "app": "SlangToon"}
+
+    @app.get("/api/config")
+    async def get_config(settings: Settings = Depends(get_settings)):
+        """返回前端所需的超时配置（秒），前端据此设置 fetch timeout。"""
+        return {
+            "script_timeout_s": settings.vision_llm_timeout,
+            "comic_timeout_s": settings.qwen_image_timeout,
+        }
 
     return app
 

@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(alias="OPENAI_API_KEY", default="")
     openai_base_url: str = Field(alias="OPENAI_BASE_URL", default="https://open.bigmodel.cn/api/paas/v4")
     openai_model: str = Field(alias="OPENAI_MODEL", default="glm-4.6v")
-    vision_llm_max_tokens: int = 8192
+    vision_llm_max_tokens: int = 16384
     vision_llm_timeout: int = 120
     vision_llm_max_retries: int = 2
 

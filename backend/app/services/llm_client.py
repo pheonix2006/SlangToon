@@ -83,12 +83,13 @@ class LLMClient:
         user_text: str,
         temperature: float = 0.8,
     ) -> LLMResponse:
-        """向 Vision LLM 发送图文请求并返回文本内容。
+        """向 Vision LLM 发送图文请求（SSE 流式）。
 
+        Streaming keeps the connection alive during long reasoning phases.
         超时 / 5xx 自动重试（指数退避），4xx 不重试直接抛出。
         """
         url = f"{self._base_url}/chat/completions"
-        logger.info("LLM 请求发送中 (url=%s, model=%s, timeout=%.0fs)", url, self._model, self._timeout)
+        logger.info("Vision 流式请求发送中 (url=%s, model=%s, timeout=%.0fs)", url, self._model, self._timeout)
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
@@ -100,39 +101,39 @@ class LLMClient:
             user_text=user_text,
             temperature=temperature,
         )
+        payload["stream"] = True  # 启用 SSE 流式
 
         last_exc: Exception | None = None
         for attempt in range(1, self._max_retries + 1):
             try:
                 async with httpx.AsyncClient(timeout=self._timeout) as client:
-                    resp = await client.post(url, json=payload, headers=headers)
+                    async with client.stream("POST", url, json=payload, headers=headers) as resp:
+                        if resp.status_code >= 500:
+                            body = await resp.aread()
+                            last_exc = LLMApiError(
+                                f"LLM API 服务端错误 {resp.status_code}: {body[:500].decode(errors='replace')}"
+                            )
+                            logger.debug(
+                                "Vision 请求 5xx (第 %d/%d 次): %s",
+                                attempt, self._max_retries, repr(last_exc),
+                            )
+                            if attempt < self._max_retries:
+                                await self._backoff(attempt)
+                            continue
 
-                    if resp.status_code >= 500:
-                        last_exc = LLMApiError(
-                            f"LLM API 服务端错误 {resp.status_code}: {resp.text[:500]}"
+                        await self._check_status(resp)
+
+                        result = await self._collect_stream(resp)
+                        logger.info("Vision 流式响应成功 (第 %d/%d 次, content_len=%d)", attempt, self._max_retries, len(result["content"]))
+                        return LLMResponse(
+                            content=result["content"],
+                            model=self._model,
+                            prompt_tokens=result["usage"].get("prompt_tokens", 0),
+                            completion_tokens=result["usage"].get("completion_tokens", 0),
+                            total_tokens=result["usage"].get("total_tokens", 0),
+                            finish_reason=result["finish_reason"],
                         )
-                        logger.debug(
-                            "Vision 请求 5xx (第 %d/%d 次): %s",
-                            attempt, self._max_retries, repr(last_exc),
-                        )
-                        if attempt < self._max_retries:
-                            await self._backoff(attempt)
-                        continue
-
-                    self._check_status(resp)
-
-                    data = resp.json()
-                    content: str = data["choices"][0]["message"]["content"]
-                    logger.info("Vision 响应成功 (第 %d/%d 次)", attempt, self._max_retries)
-                    usage = data.get("usage", {})
-                    return LLMResponse(
-                        content=content,
-                        model=self._model,
-                        prompt_tokens=usage.get("prompt_tokens", 0),
-                        completion_tokens=usage.get("completion_tokens", 0),
-                        total_tokens=usage.get("total_tokens", 0),
-                        finish_reason=data.get("choices", [{}])[0].get("finish_reason"),
-                    )
+                    # stream context manager exits here — safe point after full read
 
             except httpx.TimeoutException as exc:
                 last_exc = exc
@@ -145,7 +146,6 @@ class LLMClient:
                     await self._backoff(attempt)
 
             except LLMApiError as exc:
-                # 4xx 不重试
                 raise
             except Exception as exc:
                 last_exc = exc
@@ -167,9 +167,13 @@ class LLMClient:
         user_text: str,
         temperature: float = 0.8,
     ) -> LLMResponse:
-        """Text-only LLM call (no image). Same retry/backoff as chat_with_vision."""
+        """Text-only LLM call using SSE streaming.
+
+        Streaming keeps the connection alive during long reasoning phases,
+        preventing intermediate proxies / gateways from dropping idle connections.
+        """
         url = f"{self._base_url}/chat/completions"
-        logger.info("文本请求发送中 (url=%s, model=%s, timeout=%.0fs)", url, self._model, self._timeout)
+        logger.info("文本流式请求发送中 (url=%s, model=%s, timeout=%.0fs)", url, self._model, self._timeout)
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
@@ -182,40 +186,40 @@ class LLMClient:
             ],
             "max_tokens": self._max_tokens,
             "temperature": temperature,
+            "stream": True,
         }
 
         last_exc: Exception | None = None
         for attempt in range(1, self._max_retries + 1):
             try:
                 async with httpx.AsyncClient(timeout=self._timeout) as client:
-                    resp = await client.post(url, json=payload, headers=headers)
+                    async with client.stream("POST", url, json=payload, headers=headers) as resp:
+                        if resp.status_code >= 500:
+                            body = await resp.aread()
+                            last_exc = LLMApiError(
+                                f"LLM API 服务端错误 {resp.status_code}: {body[:500].decode(errors='replace')}"
+                            )
+                            logger.debug(
+                                "文本请求 5xx (第 %d/%d 次): %s",
+                                attempt, self._max_retries, repr(last_exc),
+                            )
+                            if attempt < self._max_retries:
+                                await self._backoff(attempt)
+                            continue
 
-                    if resp.status_code >= 500:
-                        last_exc = LLMApiError(
-                            f"LLM API 服务端错误 {resp.status_code}: {resp.text[:500]}"
+                        await self._check_status(resp)
+
+                        result = await self._collect_stream(resp)
+                        logger.info("文本流式响应成功 (第 %d/%d 次, content_len=%d)", attempt, self._max_retries, len(result["content"]))
+                        return LLMResponse(
+                            content=result["content"],
+                            model=self._model,
+                            prompt_tokens=result["usage"].get("prompt_tokens", 0),
+                            completion_tokens=result["usage"].get("completion_tokens", 0),
+                            total_tokens=result["usage"].get("total_tokens", 0),
+                            finish_reason=result["finish_reason"],
                         )
-                        logger.debug(
-                            "文本请求 5xx (第 %d/%d 次): %s",
-                            attempt, self._max_retries, repr(last_exc),
-                        )
-                        if attempt < self._max_retries:
-                            await self._backoff(attempt)
-                        continue
-
-                    self._check_status(resp)
-
-                    data = resp.json()
-                    content: str = data["choices"][0]["message"]["content"]
-                    logger.info("文本响应成功 (第 %d/%d 次)", attempt, self._max_retries)
-                    usage = data.get("usage", {})
-                    return LLMResponse(
-                        content=content,
-                        model=self._model,
-                        prompt_tokens=usage.get("prompt_tokens", 0),
-                        completion_tokens=usage.get("completion_tokens", 0),
-                        total_tokens=usage.get("total_tokens", 0),
-                        finish_reason=data.get("choices", [{}])[0].get("finish_reason"),
-                    )
+                    # stream context manager exits here — safe point after full read
 
             except httpx.TimeoutException as exc:
                 last_exc = exc
@@ -315,13 +319,56 @@ class LLMClient:
         }
 
     @staticmethod
-    def _check_status(resp: httpx.Response) -> None:
-        """检查响应状态码；4xx 转为 LLMApiError（5xx 由调用方处理）。"""
+    async def _check_status(resp: httpx.Response) -> None:
+        """检查响应状态码；4xx 转为 LLMApiError（5xx 由调用方处理）。
+
+        流式响应需先 aread() 才能访问 body。
+        """
         if 400 <= resp.status_code < 500:
-            body = resp.text[:500]
+            body = (await resp.aread()).decode(errors="replace")[:500]
             raise LLMApiError(
                 f"LLM API 错误 {resp.status_code}: {body}"
             )
+
+    @staticmethod
+    async def _collect_stream(resp: httpx.Response) -> dict:
+        """从 SSE 流中收集完整响应内容。
+
+        OpenAI 兼容格式：
+          data: {"choices":[{"delta":{"content":"..."}}]}
+          data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{...}}
+          data: [DONE]
+        """
+        content_parts: list[str] = []
+        finish_reason: str | None = None
+        usage: dict = {}
+
+        async for line in resp.aiter_lines():
+            if not line.startswith("data: "):
+                continue
+            data_str = line[6:]  # strip "data: " prefix
+            if data_str.strip() == "[DONE]":
+                break
+            try:
+                chunk = json.loads(data_str)
+            except json.JSONDecodeError:
+                continue
+
+            delta = chunk.get("choices", [{}])[0].get("delta", {})
+            if "content" in delta:
+                content_parts.append(delta["content"])
+
+            choice = chunk.get("choices", [{}])[0]
+            if choice.get("finish_reason"):
+                finish_reason = choice["finish_reason"]
+            if "usage" in chunk:
+                usage = chunk["usage"]
+
+        return {
+            "content": "".join(content_parts),
+            "finish_reason": finish_reason,
+            "usage": usage,
+        }
 
     @staticmethod
     async def _backoff(attempt: int, base: float = 1.0) -> None:
