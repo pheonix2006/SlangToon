@@ -1,8 +1,9 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { AppState } from './types';
-import type { GestureType, ScriptData, HistoryItem } from './types';
+import type { ScriptData, HistoryItem } from './types';
 import { useCamera } from './hooks/useCamera';
 import { useGestureDetector } from './hooks/useGestureDetector';
+import { useGestureConfirm } from './hooks/useGestureConfirm';
 import { useMediaPipeHands } from './hooks/useMediaPipeHands';
 import { generateScript, generateComic, getHistory, fetchConfig } from './services/api';
 import GlowBackground from './components/GlowBackground/GlowBackground';
@@ -12,6 +13,8 @@ import ScriptPreview from './components/ScriptPreview/ScriptPreview';
 import ComicDisplay from './components/ComicDisplay/ComicDisplay';
 import HistoryList from './components/HistoryList/HistoryList';
 import GalleryView from './components/GalleryView/GalleryView';
+import GestureProgressRing from './components/GestureProgressRing/GestureProgressRing';
+import GestureHint from './components/GestureHint/GestureHint';
 import ErrorDisplay from './components/ErrorDisplay';
 import LoadingOrb from './components/LoadingOrb';
 
@@ -25,9 +28,10 @@ function App() {
   const [galleryItems, setGalleryItems] = useState<HistoryItem[]>([]);
 
   const appStateRef = useRef<AppState>(appState);
-  useEffect(() => {
-    appStateRef.current = appState;
-  }, [appState]);
+  const setAppStateSync = useCallback((newState: AppState) => {
+    appStateRef.current = newState;
+    setAppState(newState);
+  }, []);
 
   // ── Fetch backend config (timeouts) ──
   useEffect(() => {
@@ -39,13 +43,13 @@ function App() {
     setScriptData(null);
     setComicUrl('');
     setError(null);
-    setAppState(AppState.CAMERA_READY);
-  }, []);
+    setAppStateSync(AppState.CAMERA_READY);
+  }, [setAppStateSync]);
 
   const goHistory = useCallback(() => {
     setError(null);
-    setAppState(AppState.HISTORY);
-  }, []);
+    setAppStateSync(AppState.HISTORY);
+  }, [setAppStateSync]);
 
   // ── Idle Timer ──
   const IDLE_TIMEOUT_MS = 20_000;
@@ -54,8 +58,8 @@ function App() {
 
   const startIdleTimer = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    idleTimerRef.current = setTimeout(() => setAppState(AppState.GALLERY), IDLE_TIMEOUT_MS);
-  }, []);
+    idleTimerRef.current = setTimeout(() => setAppStateSync(AppState.GALLERY), IDLE_TIMEOUT_MS);
+  }, [setAppStateSync]);
 
   const resetIdleTimer = useCallback(() => { startIdleTimer(); }, [startIdleTimer]);
 
@@ -71,31 +75,28 @@ function App() {
   // ── Script generation ──
   const handleGenerateScript = useCallback(async () => {
     setError(null);
-    setAppState(AppState.SCRIPT_LOADING);
+    setAppStateSync(AppState.SCRIPT_LOADING);
     try {
       const response = await generateScript();
       setScriptData(response.data);
-      setAppState(AppState.SCRIPT_PREVIEW);
+      setAppStateSync(AppState.SCRIPT_PREVIEW);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to generate script';
       setError(msg);
-      setAppState(AppState.CAMERA_READY);
+      setAppStateSync(AppState.CAMERA_READY);
     }
-  }, []);
+  }, [setAppStateSync]);
 
-  // ── Gesture handling ──
-  const onGestureDetected = useCallback(
-    (event: { gesture: GestureType; confidence: number }) => {
-      const state = appStateRef.current;
-      if (IDLE_STATES.has(state)) resetIdleTimer();
-      if (event.gesture === 'ok' && state === AppState.CAMERA_READY) { handleGenerateScript(); return; }
-      if (event.gesture === 'open_palm' && state !== AppState.COMIC_READY) { goHome(); return; }
-      if (event.gesture === 'wave' && state === AppState.GALLERY) { setAppState(AppState.CAMERA_READY); return; }
-    },
-    [goHome, handleGenerateScript, resetIdleTimer],
-  );
+  // ── Gesture detection (frame-level) ──
+  const handleWaveDetected = useCallback(() => {
+    if (appStateRef.current === AppState.GALLERY) {
+      setAppStateSync(AppState.CAMERA_READY);
+    }
+  }, [setAppStateSync]);
 
-  const { processLandmarks } = useGestureDetector({ onGestureDetected });
+  const { processLandmarks, currentGesture } = useGestureDetector({
+    onWaveDetected: handleWaveDetected,
+  });
 
   const handleMediaPipeResults = useCallback(
     (landmarks: { x: number; y: number; z: number }[]) => {
@@ -115,7 +116,7 @@ function App() {
   const handleGenerateComic = useCallback(async () => {
     if (!scriptData) return;
     setError(null);
-    setAppState(AppState.COMIC_GENERATING);
+    setAppStateSync(AppState.COMIC_GENERATING);
     try {
       const response = await generateComic({
         slang: scriptData.slang,
@@ -125,13 +126,37 @@ function App() {
         panels: scriptData.panels,
       });
       setComicUrl(response.data.comic_url);
-      setAppState(AppState.COMIC_READY);
+      setAppStateSync(AppState.COMIC_READY);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to generate comic';
       setError(msg);
-      setAppState(AppState.SCRIPT_PREVIEW);
+      setAppStateSync(AppState.SCRIPT_PREVIEW);
     }
-  }, [scriptData]);
+  }, [scriptData, setAppStateSync]);
+
+  // ── Gesture confirm layer ──
+  const handleGestureAction = useCallback((action: string) => {
+    switch (action) {
+      case 'generateScript': handleGenerateScript(); break;
+      case 'generateComic': handleGenerateComic(); break;
+      case 'reshuffleScript': handleGenerateScript(); break;
+      case 'startNew': goHome(); break;
+      case 'wakeUp': setAppStateSync(AppState.CAMERA_READY); break;
+    }
+  }, [handleGenerateScript, handleGenerateComic, goHome, setAppStateSync]);
+
+  const { activeGesture, progress, label, feedGesture } = useGestureConfirm({
+    appState,
+    onConfirmed: handleGestureAction,
+  });
+
+  // Feed currentGesture to confirm layer + reset idle timer
+  useEffect(() => {
+    feedGesture(currentGesture);
+    if (currentGesture !== 'none' && IDLE_STATES.has(appState)) {
+      resetIdleTimer();
+    }
+  }, [currentGesture, feedGesture, appState, resetIdleTimer]);
 
   // ── History ──
   const fetchHistory = useCallback(async () => {
@@ -171,43 +196,6 @@ function App() {
     <div className="relative w-full h-full bg-black text-white flex flex-col">
       {/* Global glow background */}
       <GlowBackground />
-
-      {/* Header */}
-      <header className="relative z-10 flex items-center justify-between px-8 py-5 shrink-0">
-        {appState === AppState.GALLERY ? (
-          <div className="w-full text-center">
-            <span className="text-[10px] tracking-[0.25em] font-display"
-                  style={{ color:'rgba(255,183,77,0.3)' }}>
-              SLANGTOON GALLERY
-            </span>
-          </div>
-        ) : isHistory ? (
-          <button
-            onClick={goHome}
-            className="text-[10px] tracking-[0.15em] font-display cursor-pointer"
-            style={{ color: 'rgba(255,183,77,0.4)' }}
-          >
-            ← Back
-          </button>
-        ) : (
-          <button
-            onClick={goHome}
-            className="text-[10px] tracking-[0.25em] font-display font-light cursor-pointer"
-            style={{ color: 'rgba(255,183,77,0.3)' }}
-          >
-            SLANGTOON
-          </button>
-        )}
-        {!isHistory && (
-          <button
-            onClick={goHistory}
-            className="text-[10px] tracking-[0.15em] font-display cursor-pointer"
-            style={{ color: 'rgba(255,183,77,0.25)' }}
-          >
-            History →
-          </button>
-        )}
-      </header>
 
       {/* Main Content */}
       <main className={`relative z-10 flex-1 flex flex-col items-center overflow-auto px-4 ${
@@ -317,6 +305,8 @@ function App() {
           </PageTransition>
         )}
       </main>
+      <GestureProgressRing gesture={activeGesture} progress={progress} label={label} />
+      <GestureHint appState={appState} />
     </div>
   );
 }
