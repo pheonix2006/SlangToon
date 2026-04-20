@@ -1,17 +1,12 @@
 import type { ScriptData } from '../../types';
-import GlassButton from '../GlassButton';
 
 interface ScriptPreviewProps {
   data: ScriptData;
-  onShuffle: () => void;
-  onGenerate: () => void;
-  isLoading: boolean;
 }
 
-export default function ScriptPreview({ data, onShuffle, onGenerate, isLoading }: ScriptPreviewProps) {
+export default function ScriptPreview({ data }: ScriptPreviewProps) {
   return (
     <div className="w-full max-w-4xl px-6 py-6">
-      {/* Slang title */}
       <div className="text-center mb-6">
         <h2
           className="text-2xl italic font-accent"
@@ -27,7 +22,6 @@ export default function ScriptPreview({ data, onShuffle, onGenerate, isLoading }
         </p>
       </div>
 
-      {/* Panels — horizontal row */}
       <div className="flex gap-3 mb-8 overflow-x-auto snap-x snap-mandatory lg:overflow-visible">
         {data.panels.map((panel, i) => (
           <div
@@ -56,16 +50,6 @@ export default function ScriptPreview({ data, onShuffle, onGenerate, isLoading }
             )}
           </div>
         ))}
-      </div>
-
-      {/* Action buttons */}
-      <div className="flex gap-3 justify-center">
-        <GlassButton variant="secondary" onClick={onShuffle} disabled={isLoading}>
-          Shuffle
-        </GlassButton>
-        <GlassButton onClick={onGenerate} disabled={isLoading}>
-          Generate Comic
-        </GlassButton>
       </div>
     </div>
   );

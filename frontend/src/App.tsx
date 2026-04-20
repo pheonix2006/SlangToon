@@ -283,9 +283,6 @@ function App() {
           <PageTransition>
             <ScriptPreview
               data={scriptData}
-              onShuffle={handleGenerateScript}
-              onGenerate={handleGenerateComic}
-              isLoading={false}
             />
           </PageTransition>
         )}
@@ -296,7 +293,6 @@ function App() {
             <ComicDisplay
               comicUrl={comicUrl}
               slang={scriptData?.slang ?? ''}
-              onNew={goHome}
             />
           </PageTransition>
         )}
