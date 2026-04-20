@@ -1,24 +1,20 @@
-from app.prompts.script_prompt import SCRIPT_SYSTEM_PROMPT
+from app.prompts.script_prompt import SCRIPT_SYSTEM_PROMPT_TEMPLATE, build_system_prompt
 from app.prompts.comic_prompt import build_comic_prompt, count_tokens, MAX_PROMPT_TOKENS
 
 
 class TestScriptPrompt:
     def test_prompt_contains_key_instructions(self):
-        assert "JSON" in SCRIPT_SYSTEM_PROMPT
-        assert "8-12" in SCRIPT_SYSTEM_PROMPT
-        assert "Eastern" in SCRIPT_SYSTEM_PROMPT
-        assert "WESTERN" in SCRIPT_SYSTEM_PROMPT
-        assert "English" in SCRIPT_SYSTEM_PROMPT
-        assert "concise" in SCRIPT_SYSTEM_PROMPT
-        assert "50 words" in SCRIPT_SYSTEM_PROMPT
-        assert "20 words" in SCRIPT_SYSTEM_PROMPT
-        assert "Brevity is critical" in SCRIPT_SYSTEM_PROMPT
+        assert "JSON" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
+        assert "8-12" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
+        assert "English" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
+        assert "50 words" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
+        assert "20 words" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
 
     def test_prompt_requests_correct_json_format(self):
-        assert '"slang"' in SCRIPT_SYSTEM_PROMPT
-        assert '"origin"' in SCRIPT_SYSTEM_PROMPT
-        assert '"panels"' in SCRIPT_SYSTEM_PROMPT
-        assert '"panel_count"' in SCRIPT_SYSTEM_PROMPT
+        assert '"slang"' in SCRIPT_SYSTEM_PROMPT_TEMPLATE
+        assert '"origin"' in SCRIPT_SYSTEM_PROMPT_TEMPLATE
+        assert '"panels"' in SCRIPT_SYSTEM_PROMPT_TEMPLATE
+        assert '"panel_count"' in SCRIPT_SYSTEM_PROMPT_TEMPLATE
         from app.prompts.condense_prompt import CONDENSE_SYSTEM_PROMPT
         assert CONDENSE_SYSTEM_PROMPT
         assert "JSON" in CONDENSE_SYSTEM_PROMPT
@@ -191,40 +187,36 @@ class TestCondensePrompt:
         assert "JSON" in CONDENSE_SYSTEM_PROMPT
 
 
-from app.prompts.script_prompt import build_system_prompt, SCRIPT_SYSTEM_PROMPT
-
-
 class TestBuildSystemPrompt:
     """P-01~P-03: build_system_prompt 黑名单注入测试"""
 
-    def test_empty_blacklist_returns_original_prompt(self):
-        """P-01: 空黑名单返回原始 prompt，无追加文本"""
+    def test_empty_blacklist_returns_template_without_blacklist(self):
+        """P-01: 空黑名单返回模板 prompt，无黑名单区块"""
         result = build_system_prompt([])
-        assert result == SCRIPT_SYSTEM_PROMPT
-        assert "ALREADY USED SLANGS" not in result
+        assert "JSON" in result
+        assert "8-12" in result
+        assert "DO NOT pick" not in result
 
-    def test_non_empty_blacklist_appends_section(self):
-        """P-02: 有黑名单时追加 ALREADY USED SLANGS 段落"""
+    def test_non_empty_blacklist_injects_section(self):
+        """P-02: 有黑名单时注入已用俚语区块"""
         result = build_system_prompt(["Break a leg", "Curiosity killed the cat"])
-        assert "ALREADY USED SLANGS" in result
-        assert "DO NOT PICK THESE" in result
+        assert "DO NOT pick" in result
         assert "Break a leg" in result
         assert "Curiosity killed the cat" in result
-        assert "NOT in this list" in result
+        assert "DIFFERENT" in result
 
     def test_result_is_valid_complete_prompt_string(self):
         """P-03: 返回值是合法的完整 prompt 字符串"""
         result = build_system_prompt(["X"])
         assert isinstance(result, str)
-        assert len(result) > len(SCRIPT_SYSTEM_PROMPT)
-        assert result.startswith(SCRIPT_SYSTEM_PROMPT)
         assert "JSON" in result
         assert "8-12" in result
+        assert "X" in result
 
     def test_single_item_blacklist(self):
         result = build_system_prompt(["Only one"])
-        assert "- Only one" in result
-        assert "ALREADY USED SLANGS" in result
+        assert "1. Only one" in result
+        assert "DO NOT pick" in result
 
     def test_many_items_blacklist(self):
         items = [f"Slang-{i}" for i in range(50)]

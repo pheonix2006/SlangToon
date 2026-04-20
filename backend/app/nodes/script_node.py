@@ -2,17 +2,13 @@
 import logging
 from langchain_core.runnables import RunnableConfig
 from app.graphs.state import WorkflowState
-from app.prompts.script_prompt import SCRIPT_SYSTEM_PROMPT, build_system_prompt
+from app.prompts.script_prompt import build_system_prompt
 from app.services.llm_client import LLMClient
 from app.slang_blacklist import SlangBlacklist
 
 logger = logging.getLogger(__name__)
 
-_USER_TEXT = (
-    "Pick a classical idiom, proverb, or traditional saying from any culture "
-    "— something with historical depth and cultural resonance. "
-    "Reimagine it as a modern comic. Respond with JSON only."
-)
+_USER_TEXT = "Generate a random classical idiom and its modern comic script. JSON only."
 _BLACKLIST_QUERY_SIZE = 50
 
 

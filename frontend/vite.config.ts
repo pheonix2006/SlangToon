@@ -13,6 +13,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8889',
         changeOrigin: true,
+        timeout: 6 * 60 * 1000, // 6 min — 匹配前端 SCRIPT_REQUEST 超时
       },
       '/data': {
         target: 'http://localhost:8889',

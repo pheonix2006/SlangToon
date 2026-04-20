@@ -196,14 +196,15 @@ async def test_script_node_uses_blacklist_in_prompt(tmp_data_dir):
         await script_node({"trigger": "ok_gesture"}, _make_config(settings))
     assert "Old A" in captured["sp"]
     assert "Old B" in captured["sp"]
-    assert "ALREADY USED SLANGS" in captured["sp"]
+    assert "DO NOT pick" in captured["sp"]
 
 
 @pytest.mark.asyncio
 async def test_script_node_empty_blacklist_uses_base_prompt(tmp_data_dir):
     """N-04: 空黑名单时用原始 prompt"""
     from app.config import Settings
-    from app.prompts.script_prompt import SCRIPT_SYSTEM_PROMPT
+    from app.prompts.script_prompt import build_system_prompt
+    base_prompt = build_system_prompt([])
     settings = Settings()
     mock_data = {"slang": "Fresh", "origin": "T", "explanation": "T",
                  "panel_count": 9, "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(9)]}
@@ -220,5 +221,5 @@ async def test_script_node_empty_blacklist_uses_base_prompt(tmp_data_dir):
         MockClient.return_value.chat = capture
         MockClient.extract_json_from_content = staticmethod(lambda c: json.loads(c))
         await script_node({"trigger": "ok_gesture"}, _make_config(settings))
-    assert captured == SCRIPT_SYSTEM_PROMPT
-    assert "ALREADY USED SLANGS" not in captured
+    assert captured == base_prompt
+    assert "DO NOT pick" not in captured
