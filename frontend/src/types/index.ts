@@ -62,3 +62,10 @@ export interface HistoryResponse {
     total_pages: number;
   };
 }
+
+export interface GestureAction {
+  gesture: GestureType;
+  holdMs: number;
+  action: string;
+  label: string;
+}
