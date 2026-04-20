@@ -32,6 +32,16 @@ class Settings(BaseSettings):
     qwen_image_timeout: int = 120
     qwen_image_max_retries: int = 3
 
+    # Image generation provider switch
+    image_gen_provider: str = "dashscope"  # "dashscope" | "openrouter"
+
+    # OpenRouter image generation
+    openrouter_image_apikey: str = ""
+    openrouter_image_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_image_model: str = "google/gemini-2.5-flash-image"
+    openrouter_image_timeout: int = 120
+    openrouter_image_max_retries: int = 3
+
     # 存储
     comic_storage_dir: str = "data/comics"
     history_file: str = "data/history.json"
