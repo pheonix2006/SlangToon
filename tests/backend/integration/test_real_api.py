@@ -29,6 +29,8 @@ if str(_backend_dir) not in sys.path:
     sys.path.insert(0, str(_backend_dir))
 
 from app.config import Settings
+from app.services.image_gen.openrouter_provider import OpenRouterProvider
+from app.services.image_gen.base import ImageSize
 
 
 def _has_api_keys() -> bool:
@@ -43,6 +45,21 @@ def _has_api_keys() -> bool:
 skip_no_keys = pytest.mark.skipif(
     not _has_api_keys(),
     reason="API keys not configured in .env",
+)
+
+
+def _has_openrouter_key() -> bool:
+    """Check if OpenRouter API key is configured."""
+    try:
+        s = Settings()
+        return bool(s.openrouter_image_apikey)
+    except Exception:
+        return False
+
+
+skip_no_openrouter = pytest.mark.skipif(
+    not _has_openrouter_key(),
+    reason="OpenRouter API key not configured in .env",
 )
 
 
@@ -220,6 +237,57 @@ class TestComicGraph:
 
         assert "save_node" in node_outputs
         assert "comic_url" in node_outputs["save_node"]
+
+
+# ── Stage 2b: OpenRouter — real image generation ────────────────────────
+
+
+@skip_no_openrouter
+@pytest.mark.asyncio
+class TestOpenRouterImageGen:
+    """OpenRouter: real Gemini image generation call."""
+
+    async def test_generate_from_text_returns_base64(self, real_settings):
+        """OpenRouterProvider returns valid base64 PNG."""
+        provider = OpenRouterProvider(
+            api_key=real_settings.openrouter_image_apikey,
+            base_url=real_settings.openrouter_image_base_url,
+            model=real_settings.openrouter_image_model,
+            timeout=float(real_settings.openrouter_image_timeout),
+            max_retries=real_settings.openrouter_image_max_retries,
+        )
+
+        result = await provider.generate_from_text(
+            prompt="A simple 4-panel comic strip about a cat learning to code. "
+                   "Clean line art, speech bubbles, warm colors.",
+            size=ImageSize(768, 1344),  # 9:16 but smaller for speed
+        )
+
+        assert result.startswith("data:image/")
+        assert ";base64," in result
+
+    async def test_image_is_decodable(self, real_settings):
+        """Generated image can be decoded to valid PNG."""
+        provider = OpenRouterProvider(
+            api_key=real_settings.openrouter_image_apikey,
+            base_url=real_settings.openrouter_image_base_url,
+            model=real_settings.openrouter_image_model,
+            timeout=float(real_settings.openrouter_image_timeout),
+            max_retries=real_settings.openrouter_image_max_retries,
+        )
+
+        result = await provider.generate_from_text(
+            prompt="A blue square with the text 'TEST' in white.",
+            size=ImageSize(1024, 1024),
+        )
+
+        # Decode base64
+        b64_part = result.split(",", 1)[1]
+        image_bytes = base64.b64decode(b64_part)
+        assert len(image_bytes) > 100  # Not empty
+
+        img = Image.open(BytesIO(image_bytes))
+        assert img.size[0] > 0 and img.size[1] > 0
 
 
 # ── Stage 3: Full E2E Flow — script -> comic ───────────────────────────
