@@ -46,10 +46,6 @@ function App() {
     setAppStateSync(AppState.CAMERA_READY);
   }, [setAppStateSync]);
 
-  const goHistory = useCallback(() => {
-    setError(null);
-    setAppStateSync(AppState.HISTORY);
-  }, [setAppStateSync]);
 
   // ── Idle Timer ──
   const IDLE_TIMEOUT_MS = 20_000;

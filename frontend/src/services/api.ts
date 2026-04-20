@@ -8,7 +8,7 @@ import { API_BASE_URL, API_ENDPOINTS, TIMEOUTS } from '../constants';
 /** 后端超时秒数 + 60s 缓冲 → 前端 fetch 超时毫秒数 */
 const BUFFER_MS = 60_000;
 
-const dynamicTimeouts = {
+const dynamicTimeouts: { script: number; comic: number } = {
   script: TIMEOUTS.SCRIPT_REQUEST,
   comic: TIMEOUTS.COMIC_REQUEST,
 };
