@@ -4,7 +4,7 @@ import type { NormalizedLandmark } from '../utils/gestureAlgo';
 import { detectGesture, createWaveBuffer, detectWave } from '../utils/gestureAlgo';
 
 const DEFAULT_DEBOUNCE_MS = 500;
-const MIN_CONFIDENCE = 0.5;
+const MIN_CONFIDENCE = 0.25;
 const WAVE_BUFFER_SIZE = 10;
 const WAVE_THRESHOLD = 0.12;
 const WAVE_COOLDOWN_FRAMES = 30;
