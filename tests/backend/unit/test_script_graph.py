@@ -17,8 +17,8 @@ async def test_script_graph_produces_valid_output(tmp_data_dir):
         "slang": "Break a leg",
         "origin": "Western theater",
         "explanation": "Good luck wish",
-        "panel_count": 8,
-        "panels": [{"scene": f"Scene {i}", "dialogue": ""} for i in range(8)],
+        "panel_count": 4,
+        "panels": [{"scene": f"Scene {i}", "dialogue": ""} for i in range(4)],
     }
 
     import unittest.mock as mock
@@ -38,5 +38,5 @@ async def test_script_graph_produces_valid_output(tmp_data_dir):
         )
 
     assert result["slang"] == "Break a leg"
-    assert result["panel_count"] == 8
-    assert len(result["panels"]) == 8
+    assert result["panel_count"] == 4
+    assert len(result["panels"]) == 4

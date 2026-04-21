@@ -13,7 +13,7 @@ _BLACKLIST_QUERY_SIZE = 50
 
 
 async def script_node(state: WorkflowState, config: RunnableConfig) -> dict:
-    """Call GLM-4.6V to generate random slang + 8-12 panel comic script.
+    """Call GLM-4.6V to generate random slang + 4 panel comic script.
 
     Returns: Partial WorkflowState update dict.
     Raises: LLMTimeoutError, LLMApiError, LLMResponseError, ValueError.
@@ -44,8 +44,8 @@ async def script_node(state: WorkflowState, config: RunnableConfig) -> dict:
     # Validate
     panel_count = data.get("panel_count", 0)
     panels = data.get("panels", [])
-    if not (8 <= panel_count <= 12):
-        raise ValueError(f"Invalid panel_count: {panel_count}, must be 8-12")
+    if not (3 <= panel_count <= 6):
+        raise ValueError(f"Invalid panel_count: {panel_count}, must be 3-6")
     if len(panels) != panel_count:
         raise ValueError(
             f"panels length ({len(panels)}) != panel_count ({panel_count})"

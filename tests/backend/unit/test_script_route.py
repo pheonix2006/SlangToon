@@ -30,8 +30,8 @@ async def test_generate_script_success(client, mock_script_data):
     data = resp.json()
     assert data["code"] == 0
     assert data["data"]["slang"] == "Break a leg"
-    assert data["data"]["panel_count"] == 8
-    assert len(data["data"]["panels"]) == 8
+    assert data["data"]["panel_count"] == 4
+    assert len(data["data"]["panels"]) == 4
 
 
 @pytest.mark.asyncio

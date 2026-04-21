@@ -5,10 +5,14 @@ from app.prompts.comic_prompt import build_comic_prompt, count_tokens, MAX_PROMP
 class TestScriptPrompt:
     def test_prompt_contains_key_instructions(self):
         assert "JSON" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
-        assert "8-12" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
+        assert "panel_count" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
         assert "English" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
         assert "50 words" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
         assert "20 words" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
+
+    def test_prompt_requests_4_panels(self):
+        assert "4" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
+        assert "EXACTLY 4" in SCRIPT_SYSTEM_PROMPT_TEMPLATE
 
     def test_prompt_requests_correct_json_format(self):
         assert '"slang"' in SCRIPT_SYSTEM_PROMPT_TEMPLATE
@@ -194,7 +198,7 @@ class TestBuildSystemPrompt:
         """P-01: 空黑名单返回模板 prompt，无黑名单区块"""
         result = build_system_prompt([])
         assert "JSON" in result
-        assert "8-12" in result
+        assert "EXACTLY 4" in result
         assert "DO NOT pick" not in result
 
     def test_non_empty_blacklist_injects_section(self):
@@ -210,7 +214,7 @@ class TestBuildSystemPrompt:
         result = build_system_prompt(["X"])
         assert isinstance(result, str)
         assert "JSON" in result
-        assert "8-12" in result
+        assert "EXACTLY 4" in result
         assert "X" in result
 
     def test_single_item_blacklist(self):

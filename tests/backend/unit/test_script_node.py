@@ -22,8 +22,8 @@ async def test_script_node_valid_response_returns_state_update(tmp_data_dir):
         "slang": "Break a leg",
         "origin": "Western theater",
         "explanation": "Good luck wish",
-        "panel_count": 8,
-        "panels": [{"scene": f"Scene {i}", "dialogue": ""} for i in range(8)],
+        "panel_count": 4,
+        "panels": [{"scene": f"Scene {i}", "dialogue": ""} for i in range(4)],
     }
 
     import unittest.mock as mock
@@ -42,20 +42,20 @@ async def test_script_node_valid_response_returns_state_update(tmp_data_dir):
         result = await script_node({"trigger": "ok_gesture"}, _make_config(settings))
 
     assert result["slang"] == "Break a leg"
-    assert result["panel_count"] == 8
-    assert len(result["panels"]) == 8
+    assert result["panel_count"] == 4
+    assert len(result["panels"]) == 4
 
 
 @pytest.mark.asyncio
 async def test_script_node_invalid_panel_count_raises_value_error(tmp_data_dir):
-    """script_node raises ValueError when panel_count is outside 8-12."""
+    """script_node raises ValueError when panel_count is outside 3-6."""
     from app.config import Settings
     settings = Settings()
     mock_data = {
         "slang": "Test",
         "origin": "Test",
         "explanation": "Test",
-        "panel_count": 3,
+        "panel_count": 2,
         "panels": [{"scene": "A", "dialogue": ""}],
     }
 
@@ -82,7 +82,7 @@ async def test_script_node_panel_count_mismatch_raises_value_error(tmp_data_dir)
         "slang": "Test",
         "origin": "Test",
         "explanation": "Test",
-        "panel_count": 8,
+        "panel_count": 4,
         "panels": [{"scene": "A", "dialogue": ""}],  # only 1 panel
     }
 
@@ -101,16 +101,16 @@ async def test_script_node_panel_count_mismatch_raises_value_error(tmp_data_dir)
 
 
 @pytest.mark.asyncio
-async def test_script_node_valid_12_panels(tmp_data_dir):
-    """script_node accepts 12 panels (upper bound)."""
+async def test_script_node_valid_6_panels(tmp_data_dir):
+    """script_node accepts 6 panels (upper bound)."""
     from app.config import Settings
     settings = Settings()
     mock_data = {
         "slang": "Test",
         "origin": "Test",
         "explanation": "Test",
-        "panel_count": 12,
-        "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(12)],
+        "panel_count": 6,
+        "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(6)],
     }
 
     import unittest.mock as mock
@@ -125,8 +125,8 @@ async def test_script_node_valid_12_panels(tmp_data_dir):
 
         result = await script_node({"trigger": "ok_gesture"}, _make_config(settings))
 
-    assert result["panel_count"] == 12
-    assert len(result["panels"]) == 12
+    assert result["panel_count"] == 6
+    assert len(result["panels"]) == 6
 
 
 @pytest.mark.asyncio
@@ -136,8 +136,8 @@ async def test_script_node_success_adds_to_blacklist(tmp_data_dir):
     settings = Settings()
     mock_data = {
         "slang": "Break a leg", "origin": "Western theater",
-        "explanation": "Good luck wish", "panel_count": 8,
-        "panels": [{"scene": f"Scene {i}", "dialogue": ""} for i in range(8)],
+        "explanation": "Good luck wish", "panel_count": 4,
+        "panels": [{"scene": f"Scene {i}", "dialogue": ""} for i in range(4)],
     }
     mock_bl = MagicMock()
     mock_bl.get_recent.return_value = []
@@ -160,7 +160,7 @@ async def test_script_node_failure_does_not_add_to_blacklist(tmp_data_dir):
     from app.config import Settings
     settings = Settings()
     mock_data = {"slang": "Bad", "origin": "T", "explanation": "T",
-                 "panel_count": 3, "panels": [{"scene": "A", "dialogue": ""}]}
+                 "panel_count": 2, "panels": [{"scene": "A", "dialogue": ""}]}
     mock_bl = MagicMock()
     mock_bl.get_recent.return_value = []
     with patch("app.nodes.script_node.SlangBlacklist") as MockBL, \
@@ -181,7 +181,7 @@ async def test_script_node_uses_blacklist_in_prompt(tmp_data_dir):
     from app.config import Settings
     settings = Settings()
     mock_data = {"slang": "New", "origin": "T", "explanation": "T",
-                 "panel_count": 8, "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(8)]}
+                 "panel_count": 4, "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(4)]}
     mock_bl = MagicMock()
     mock_bl.get_recent.return_value = ["Old A", "Old B"]
     captured = {}
@@ -207,7 +207,7 @@ async def test_script_node_empty_blacklist_uses_base_prompt(tmp_data_dir):
     base_prompt = build_system_prompt([])
     settings = Settings()
     mock_data = {"slang": "Fresh", "origin": "T", "explanation": "T",
-                 "panel_count": 9, "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(9)]}
+                 "panel_count": 4, "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(4)]}
     mock_bl = MagicMock()
     mock_bl.get_recent.return_value = []
     captured = None

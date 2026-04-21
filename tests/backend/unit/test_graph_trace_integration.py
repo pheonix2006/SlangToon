@@ -19,8 +19,8 @@ async def test_invoke_with_trace_saves_local_trace(tmp_data_dir):
         "slang": "Test",
         "origin": "Test origin",
         "explanation": "Test explanation",
-        "panel_count": 8,
-        "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(8)],
+        "panel_count": 4,
+        "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(4)],
     }
 
     import unittest.mock as mock
