@@ -3,13 +3,14 @@ import type { GestureType } from '../types';
 import type { NormalizedLandmark } from '../utils/gestureAlgo';
 import { detectGesture, createWaveBuffer, detectWave } from '../utils/gestureAlgo';
 
-const DEFAULT_DEBOUNCE_FRAMES = 3;
+const DEFAULT_DEBOUNCE_MS = 500;
+const MIN_CONFIDENCE = 0.5;
 const WAVE_BUFFER_SIZE = 10;
 const WAVE_THRESHOLD = 0.12;
 const WAVE_COOLDOWN_FRAMES = 30;
 
 interface UseGestureDetectorOptions {
-  debounceFrames?: number;
+  debounceMs?: number;
   onWaveDetected?: () => void;
 }
 
@@ -22,14 +23,15 @@ interface UseGestureDetectorReturn {
 export function useGestureDetector(
   options: UseGestureDetectorOptions = {},
 ): UseGestureDetectorReturn {
-  const { debounceFrames = DEFAULT_DEBOUNCE_FRAMES, onWaveDetected } = options;
+  const { debounceMs = DEFAULT_DEBOUNCE_MS, onWaveDetected } = options;
 
   const [currentGesture, setCurrentGesture] = useState<GestureType>('none');
   const [currentConfidence, setCurrentConfidence] = useState(0);
 
-  const counterRef = useRef(0);
   const pendingGestureRef = useRef<GestureType>('none');
+  const pendingStartRef = useRef<number | null>(null);
   const confirmedGestureRef = useRef<GestureType>('none');
+  const noneStartRef = useRef<number | null>(null);
   const waveBufferRef = useRef(createWaveBuffer(WAVE_BUFFER_SIZE));
   const waveCooldownRef = useRef(0);
 
@@ -40,7 +42,8 @@ export function useGestureDetector(
       }
 
       const result = detectGesture(landmarks);
-      const { gesture, confidence } = result;
+      let gesture = result.gesture;
+      const confidence = result.confidence;
 
       if (waveCooldownRef.current > 0) waveCooldownRef.current -= 1;
 
@@ -50,15 +53,21 @@ export function useGestureDetector(
         waveCooldownRef.current = WAVE_COOLDOWN_FRAMES;
       }
 
+      if (gesture !== 'none' && confidence < MIN_CONFIDENCE) {
+        gesture = 'none';
+      }
+
+      const now = Date.now();
+
       if (gesture === 'none') {
-        if (pendingGestureRef.current === 'none') {
-          counterRef.current += 1;
-        } else {
-          pendingGestureRef.current = 'none';
-          counterRef.current = 1;
+        pendingGestureRef.current = 'none';
+        pendingStartRef.current = null;
+
+        if (noneStartRef.current === null) {
+          noneStartRef.current = now;
         }
 
-        if (counterRef.current >= debounceFrames && confirmedGestureRef.current !== 'none') {
+        if (confirmedGestureRef.current !== 'none' && now - noneStartRef.current >= debounceMs) {
           confirmedGestureRef.current = 'none';
           setCurrentGesture('none');
           setCurrentConfidence(0);
@@ -66,16 +75,18 @@ export function useGestureDetector(
         return;
       }
 
+      noneStartRef.current = null;
+
       if (gesture === pendingGestureRef.current) {
-        counterRef.current += 1;
-        if (counterRef.current >= debounceFrames && confirmedGestureRef.current !== gesture) {
+        const elapsed = now - (pendingStartRef.current ?? now);
+        if (elapsed >= debounceMs && confirmedGestureRef.current !== gesture) {
           confirmedGestureRef.current = gesture;
           setCurrentGesture(gesture);
           setCurrentConfidence(confidence);
         }
       } else {
         pendingGestureRef.current = gesture;
-        counterRef.current = 1;
+        pendingStartRef.current = now;
         if (confirmedGestureRef.current !== 'none') {
           confirmedGestureRef.current = 'none';
           setCurrentGesture('none');
@@ -83,7 +94,7 @@ export function useGestureDetector(
         }
       }
     },
-    [debounceFrames, onWaveDetected],
+    [debounceMs, onWaveDetected],
   );
 
   return { processLandmarks, currentGesture, currentConfidence };
