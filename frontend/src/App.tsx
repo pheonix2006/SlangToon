@@ -50,6 +50,7 @@ function App() {
   // ── Idle Timer ──
   const IDLE_TIMEOUT_MS = 20_000;
   const IDLE_STATES = new Set([AppState.CAMERA_READY, AppState.COMIC_READY]);
+  const GLOW_STATES = new Set([AppState.SCRIPT_LOADING, AppState.COMIC_GENERATING]);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startIdleTimer = useCallback(() => {
@@ -190,52 +191,36 @@ function App() {
 
   return (
     <div className="relative w-full h-full bg-black text-white flex flex-col">
-      {/* Global glow background */}
-      <GlowBackground />
+      {/* Global glow background — only during loading states */}
+      {GLOW_STATES.has(appState) && <GlowBackground />}
 
       {/* Main Content */}
-      <main className={`relative z-10 flex-1 flex flex-col items-center overflow-auto px-4 ${
-        (appState === AppState.COMIC_READY || appState === AppState.SCRIPT_PREVIEW)
-          ? 'justify-start'
-          : 'justify-center'
-      }`}>
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center overflow-hidden">
         {/* Camera always mounted — CSS-hidden when not needed to keep stream + MediaPipe alive */}
         <div
           className={!showCamera ? 'absolute w-0 h-0 overflow-hidden opacity-0 pointer-events-none' : undefined}
           aria-hidden={!showCamera}
         >
-          <PageTransition>
-            <div className={`relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden glass-panel ${
-              appState === AppState.GALLERY ? 'absolute opacity-0 pointer-events-none w-0 h-0 overflow-hidden' : ''
-            }`}>
-              <CameraView
-                videoRef={videoRef}
-                canvasRef={canvasRef}
-                className={`w-full h-full ${isReady ? '' : 'invisible'}`}
-              />
-              {!isReady && appState !== AppState.GALLERY && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                  {cameraError ? (
-                    <ErrorDisplay message={cameraError} onRetry={restartCamera} retryText="Restart Camera" />
-                  ) : (
-                    <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                      Starting camera...
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-            {appState === AppState.CAMERA_READY && (
-              <div className="mt-5 text-center">
-                {error && (
-                  <p className="text-sm mb-2" style={{ color: 'rgba(255,183,77,0.6)' }}>{error}</p>
+          <div className={`fixed inset-0 ${
+            appState === AppState.GALLERY ? 'opacity-0 pointer-events-none' : ''
+          }`}>
+            <CameraView
+              videoRef={videoRef}
+              canvasRef={canvasRef}
+              className={`w-full h-full ${isReady ? '' : 'invisible'}`}
+            />
+            {!isReady && appState !== AppState.GALLERY && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                {cameraError ? (
+                  <ErrorDisplay message={cameraError} onRetry={restartCamera} retryText="Restart Camera" />
+                ) : (
+                  <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                    Starting camera...
+                  </p>
                 )}
-                <p className="text-[11px] tracking-[0.1em] font-display" style={{ color: 'rgba(255,183,77,0.35)' }}>
-                  Show OK sign to generate · Open palm to go back
-                </p>
               </div>
             )}
-          </PageTransition>
+          </div>
         </div>
 
         {/* SCRIPT_LOADING / COMIC_GENERATING */}
