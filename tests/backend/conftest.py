@@ -50,15 +50,15 @@ def mock_script_data():
         "slang": "Break a leg",
         "origin": "Western theater tradition",
         "explanation": "Used to wish good luck before a performance",
-        "panel_count": 8,
+        "panel_count": 4,
         "panels": [
             {
                 "scene": "A nervous actor paces backstage, clutching a crumpled script. The stage manager glances at the clock.",
-                "dialogue": 'Narrator: "It was opening night..."',
+                "dialogue": "Narrator: 'It was opening night...'",
             },
             {
                 "scene": "Friends gather around the actor, giving thumbs up with warm smiles.",
-                "dialogue": 'Friend: "You\'ve got this!"',
+                "dialogue": "Friend: 'You got this!'",
             },
             {
                 "scene": "The actor steps onto the stage under a bright spotlight. The audience is a sea of silhouettes.",
@@ -66,23 +66,7 @@ def mock_script_data():
             },
             {
                 "scene": "Standing ovation! Confetti falls. The actor beams with joy and happy tears.",
-                "dialogue": 'Narrator: "Break a leg indeed."',
-            },
-            {
-                "scene": "The actor bows gracefully as the curtain begins to close.",
-                "dialogue": "",
-            },
-            {
-                "scene": "Backstage, the cast celebrates with a group hug.",
-                "dialogue": 'Director: "Incredible!"',
-            },
-            {
-                "scene": "The actor looks at the crumpled script, now smoothed out and signed by the cast.",
-                "dialogue": "",
-            },
-            {
-                "scene": "The actor walks out of the theater into the night, smiling under the marquee lights.",
-                "dialogue": 'Narrator: "And that\'s how you break a leg."',
+                "dialogue": "Narrator: 'Break a leg indeed.'",
             },
         ],
     }
@@ -96,8 +80,8 @@ def mock_script_response_text(mock_script_data):
 
 @pytest.fixture
 def mock_comic_prompt():
-    """Mock visual prompt for Qwen Image 2.0."""
-    return "A 8-panel layout (2 rows x 4 columns grid) comic strip in manga style, 16:9 layout. Panel 1: A nervous actor paces backstage. Panel 2: Friends give thumbs up. Panel 3: Actor steps onto spotlight stage. Panel 4: Standing ovation. Panel 5: Curtain closes. Panel 6: Cast celebrates. Panel 7: Signed script. Panel 8: Actor under marquee. Speech bubbles with dialogue. Clean line art, warm color palette."
+    """Mock visual prompt for comic generation."""
+    return "A 4-panel 2x2 grid comic strip, 16:9 landscape. Panel 1: A nervous actor paces backstage. Panel 2: Friends give thumbs up. Panel 3: Actor steps onto spotlight stage. Panel 4: Standing ovation. Speech bubbles with dialogue. Clean line art, warm color palette."
 
 
 @pytest.fixture
