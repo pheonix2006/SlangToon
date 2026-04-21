@@ -125,7 +125,7 @@ export function useMediaPipeHands({
           maxNumHands: 1,
           modelComplexity: 1,
           minDetectionConfidence: 0.7,
-          minTrackingConfidence: 0.5,
+          minTrackingConfidence: 0.7,
         });
 
         hands.onResults(handleResults);
