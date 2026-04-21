@@ -7,10 +7,12 @@ const mockData: ScriptData = {
   slang: 'No cap',
   origin: 'Gen Z slang',
   explanation: 'For real, not lying',
-  panel_count: 2,
+  panel_count: 4,
   panels: [
     { scene: 'A student in class', dialogue: 'No cap, this test is easy' },
     { scene: 'Gets the results', dialogue: '' },
+    { scene: 'Celebrating with friends', dialogue: 'Told you!' },
+    { scene: 'Walking home with a smile', dialogue: '' },
   ],
 };
 
@@ -30,6 +32,8 @@ describe('ScriptPreview (gesture-only)', () => {
     render(<ScriptPreview data={mockData} />);
     expect(screen.getByText('PANEL 1')).toBeInTheDocument();
     expect(screen.getByText('PANEL 2')).toBeInTheDocument();
+    expect(screen.getByText('PANEL 3')).toBeInTheDocument();
+    expect(screen.getByText('PANEL 4')).toBeInTheDocument();
   });
 
   it('renders panel scene text', () => {
