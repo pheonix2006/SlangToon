@@ -70,7 +70,7 @@ export function detectGesture(
 
   // OK sign: thumb+index tips close, other 3 fingers extended
   const thumbTipToIndexTip = distance(landmarks[THUMB_TIP], landmarks[INDEX_TIP]);
-  const okThreshold = 0.06;
+  const okThreshold = 0.08;
 
   if (
     thumbTipToIndexTip < okThreshold &&
