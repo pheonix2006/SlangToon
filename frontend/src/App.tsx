@@ -256,12 +256,10 @@ function App() {
 
         {/* COMIC_READY */}
         {appState === AppState.COMIC_READY && (
-          <PageTransition>
-            <ComicDisplay
-              comicUrl={comicUrl}
-              slang={scriptData?.slang ?? ''}
-            />
-          </PageTransition>
+          <ComicDisplay
+            comicUrl={comicUrl}
+            slang={scriptData?.slang ?? ''}
+          />
         )}
 
         {/* HISTORY */}
@@ -279,9 +277,7 @@ function App() {
 
         {/* GALLERY */}
         {appState === AppState.GALLERY && (
-          <PageTransition>
-            <GalleryView items={galleryItems} />
-          </PageTransition>
+          <GalleryView items={galleryItems} />
         )}
       </main>
       <GestureProgressRing gesture={activeGesture} progress={progress} label={label} />
