@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Panel(BaseModel):
@@ -12,8 +12,18 @@ class ScriptData(BaseModel):
     slang: str = Field(..., description="The slang or idiom")
     origin: str = Field(..., description="Cultural origin (Eastern/Western)")
     explanation: str = Field(..., description="Brief explanation of the slang")
-    panel_count: int = Field(..., ge=8, le=12, description="Number of panels (8-12)")
-    panels: list[Panel] = Field(..., min_length=8, max_length=12, description="Panel descriptions")
+    panel_count: int = Field(..., ge=3, le=6, description="Number of panels (3-6)")
+    panels: list[Panel] = Field(..., min_length=3, max_length=6, description="Panel descriptions")
+
+    @model_validator(mode="after")
+    def check_panel_count_matches(self) -> "ScriptData":
+        """Ensure panel_count matches the actual number of panels."""
+        if self.panel_count != len(self.panels):
+            raise ValueError(
+                f"panel_count ({self.panel_count}) does not match "
+                f"number of panels ({len(self.panels)})"
+            )
+        return self
 
 
 class ScriptRequest(BaseModel):

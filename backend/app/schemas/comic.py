@@ -8,8 +8,8 @@ class ComicRequest(BaseModel):
     slang: str = Field(..., description="The slang being illustrated")
     origin: str = Field(..., description="Cultural origin of the slang")
     explanation: str = Field(..., description="Explanation of the slang")
-    panel_count: int = Field(..., ge=8, le=12, description="Number of panels")
-    panels: list[Panel] = Field(..., min_length=8, max_length=12, description="Panel descriptions")
+    panel_count: int = Field(..., ge=3, le=6, description="Number of panels")
+    panels: list[Panel] = Field(..., min_length=3, max_length=6, description="Panel descriptions")
 
 
 class ComicResponse(BaseModel):
