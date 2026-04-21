@@ -97,9 +97,7 @@ function App() {
 
   const handleMediaPipeResults = useCallback(
     (landmarks: { x: number; y: number; z: number }[]) => {
-      if (landmarks.length > 0) {
-        processLandmarks(landmarks);
-      }
+      processLandmarks(landmarks);
     },
     [processLandmarks],
   );

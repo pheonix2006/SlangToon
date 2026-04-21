@@ -49,16 +49,22 @@ export function detectGesture(
     return { gesture: 'none', confidence: 0 };
   }
 
-  // Check for OK sign: thumb tip close to index tip, other 3 fingers extended
-  const thumbTipToIndexTip = distance(landmarks[THUMB_TIP], landmarks[INDEX_TIP]);
-  const okThreshold = 0.06;
-
   const middleExtended = isFingerExtended(landmarks, MIDDLE_TIP, MIDDLE_PIP);
   const ringExtended = isFingerExtended(landmarks, RING_TIP, RING_PIP);
   const pinkyExtended = isFingerExtended(landmarks, PINKY_TIP, PINKY_PIP);
+  const indexExtended = isFingerExtended(landmarks, INDEX_TIP, INDEX_PIP);
+  const thumbCurled =
+    distance(landmarks[THUMB_TIP], landmarks[INDEX_MCP]) <
+    distance(landmarks[THUMB_IP], landmarks[INDEX_MCP]);
+
+  // OK sign: thumb+index form a circle, other 3 fingers extended
+  const thumbTipToIndexTip = distance(landmarks[THUMB_TIP], landmarks[INDEX_TIP]);
+  const okThreshold = 0.05;
 
   if (
     thumbTipToIndexTip < okThreshold &&
+    !indexExtended &&
+    thumbCurled &&
     middleExtended &&
     ringExtended &&
     pinkyExtended
@@ -67,12 +73,10 @@ export function detectGesture(
     return { gesture: 'ok', confidence };
   }
 
-  // Check for open palm: all 5 fingers extended
+  // Open palm: all 5 fingers extended
   const thumbExtended =
     distance(landmarks[THUMB_TIP], landmarks[INDEX_MCP]) >
     distance(landmarks[THUMB_IP], landmarks[INDEX_MCP]);
-
-  const indexExtended = isFingerExtended(landmarks, INDEX_TIP, INDEX_PIP);
 
   if (
     thumbExtended &&
