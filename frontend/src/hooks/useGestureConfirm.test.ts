@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useGestureConfirm } from './useGestureConfirm';
 import { AppState } from '../types';
-import type { GestureType } from '../types';
 
 describe('useGestureConfirm', () => {
   beforeEach(() => { vi.useFakeTimers(); });
@@ -42,14 +41,42 @@ describe('useGestureConfirm', () => {
     expect(onConfirmed).toHaveBeenCalledWith('generateScript');
   });
 
-  it('resets progress when gesture changes', () => {
+  it('does not reset immediately on brief gesture drop (grace period)', () => {
     const onConfirmed = vi.fn();
     const { result } = renderHook(() =>
       useGestureConfirm({ appState: AppState.CAMERA_READY, onConfirmed }),
     );
     act(() => result.current.feedGesture('ok'));
     act(() => { vi.advanceTimersByTime(1000); });
+    expect(result.current.progress).toBeGreaterThan(0.4);
+
+    // Brief drop — should NOT reset within 300ms grace
     act(() => result.current.feedGesture('none'));
+    expect(result.current.activeGesture).toBe('ok');
+    expect(result.current.progress).toBeGreaterThan(0);
+
+    // Gesture comes back within grace period
+    act(() => { vi.advanceTimersByTime(200); });
+    act(() => result.current.feedGesture('ok'));
+
+    // Progress should continue, not reset
+    act(() => { vi.advanceTimersByTime(1000); });
+    expect(onConfirmed).toHaveBeenCalledWith('generateScript');
+  });
+
+  it('resets after grace period expires without gesture recovery', () => {
+    const onConfirmed = vi.fn();
+    const { result } = renderHook(() =>
+      useGestureConfirm({ appState: AppState.CAMERA_READY, onConfirmed }),
+    );
+    act(() => result.current.feedGesture('ok'));
+    act(() => { vi.advanceTimersByTime(1000); });
+
+    // Gesture drops
+    act(() => result.current.feedGesture('none'));
+    // Grace period expires (300ms)
+    act(() => { vi.advanceTimersByTime(350); });
+
     expect(result.current.activeGesture).toBeNull();
     expect(result.current.progress).toBe(0);
     expect(onConfirmed).not.toHaveBeenCalled();

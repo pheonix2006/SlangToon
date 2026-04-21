@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useGestureDetector } from './useGestureDetector';
 import type { NormalizedLandmark } from '../utils/gestureAlgo';
@@ -35,8 +35,9 @@ function makeLandmarks(
 
 function makeOKLandmarks(): NormalizedLandmark[] {
   return makeLandmarks({
-    4: { x: 0.35, y: 0.3, z: 0 },
-    8: { x: 0.35, y: 0.31, z: 0.001 },
+    4: { x: 0.38, y: 0.62, z: 0 },
+    8: { x: 0.39, y: 0.63, z: 0 },
+    3: { x: 0.3, y: 0.5, z: 0 },
   });
 }
 
@@ -57,48 +58,63 @@ function makeNoneLandmarks(): NormalizedLandmark[] {
   });
 }
 
-describe('useGestureDetector (frame-level output)', () => {
+describe('useGestureDetector (time-based debounce)', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
   it('initial state is none with 0 confidence', () => {
     const { result } = renderHook(() => useGestureDetector());
     expect(result.current.currentGesture).toBe('none');
     expect(result.current.currentConfidence).toBe(0);
   });
 
-  it('outputs ok after 3 consecutive OK frames (debounce)', () => {
-    const { result } = renderHook(() => useGestureDetector({ debounceFrames: 3 }));
+  it('does not confirm gesture before debounceMs elapses', () => {
+    const { result } = renderHook(() => useGestureDetector({ debounceMs: 500 }));
     act(() => result.current.processLandmarks(makeOKLandmarks()));
     expect(result.current.currentGesture).toBe('none');
+
+    vi.advanceTimersByTime(200);
     act(() => result.current.processLandmarks(makeOKLandmarks()));
     expect(result.current.currentGesture).toBe('none');
+  });
+
+  it('confirms ok after debounceMs of stable detection', () => {
+    const { result } = renderHook(() => useGestureDetector({ debounceMs: 500 }));
+    act(() => result.current.processLandmarks(makeOKLandmarks()));
+
+    vi.advanceTimersByTime(500);
     act(() => result.current.processLandmarks(makeOKLandmarks()));
     expect(result.current.currentGesture).toBe('ok');
   });
 
   it('resets to none when gesture changes mid-debounce', () => {
-    const { result } = renderHook(() => useGestureDetector({ debounceFrames: 3 }));
+    const { result } = renderHook(() => useGestureDetector({ debounceMs: 500 }));
     act(() => result.current.processLandmarks(makeOKLandmarks()));
-    act(() => result.current.processLandmarks(makeOKLandmarks()));
+
+    vi.advanceTimersByTime(300);
     act(() => result.current.processLandmarks(makePalmLandmarks()));
     expect(result.current.currentGesture).toBe('none');
   });
 
-  it('outputs open_palm after debounce threshold', () => {
-    const { result } = renderHook(() => useGestureDetector({ debounceFrames: 3 }));
-    for (let i = 0; i < 3; i++) {
-      act(() => result.current.processLandmarks(makePalmLandmarks()));
-    }
+  it('confirms open_palm after debounceMs', () => {
+    const { result } = renderHook(() => useGestureDetector({ debounceMs: 500 }));
+    act(() => result.current.processLandmarks(makePalmLandmarks()));
+
+    vi.advanceTimersByTime(500);
+    act(() => result.current.processLandmarks(makePalmLandmarks()));
     expect(result.current.currentGesture).toBe('open_palm');
   });
 
-  it('returns to none after none frames exceed debounce', () => {
-    const { result } = renderHook(() => useGestureDetector({ debounceFrames: 3 }));
-    for (let i = 0; i < 3; i++) {
-      act(() => result.current.processLandmarks(makeOKLandmarks()));
-    }
+  it('returns to none after none persists for debounceMs', () => {
+    const { result } = renderHook(() => useGestureDetector({ debounceMs: 500 }));
+    act(() => result.current.processLandmarks(makeOKLandmarks()));
+    vi.advanceTimersByTime(500);
+    act(() => result.current.processLandmarks(makeOKLandmarks()));
     expect(result.current.currentGesture).toBe('ok');
-    for (let i = 0; i < 3; i++) {
-      act(() => result.current.processLandmarks(makeNoneLandmarks()));
-    }
+
+    act(() => result.current.processLandmarks(makeNoneLandmarks()));
+    vi.advanceTimersByTime(500);
+    act(() => result.current.processLandmarks(makeNoneLandmarks()));
     expect(result.current.currentGesture).toBe('none');
   });
 
@@ -128,5 +144,18 @@ describe('useGestureDetector (frame-level output)', () => {
       act(() => result.current.processLandmarks(landmarks));
     }
     expect(onWave).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets when no hand detected (empty landmarks)', () => {
+    const { result } = renderHook(() => useGestureDetector({ debounceMs: 500 }));
+    act(() => result.current.processLandmarks(makeOKLandmarks()));
+    vi.advanceTimersByTime(500);
+    act(() => result.current.processLandmarks(makeOKLandmarks()));
+    expect(result.current.currentGesture).toBe('ok');
+
+    act(() => result.current.processLandmarks([]));
+    vi.advanceTimersByTime(500);
+    act(() => result.current.processLandmarks([]));
+    expect(result.current.currentGesture).toBe('none');
   });
 });
