@@ -4,6 +4,7 @@ import { GESTURE_MAP } from '../constants/gestureMap';
 
 const COOLDOWN_MS = 1000;
 const TICK_INTERVAL_MS = 50;
+const GRACE_MS = 300;
 
 interface UseGestureConfirmOptions {
   appState: AppState;
@@ -29,6 +30,7 @@ export function useGestureConfirm({
   const matchedActionRef = useRef<GestureAction | null>(null);
   const cooldownUntilRef = useRef(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearTick = useCallback(() => {
     if (tickRef.current) {
@@ -37,17 +39,25 @@ export function useGestureConfirm({
     }
   }, []);
 
+  const clearGrace = useCallback(() => {
+    if (graceTimerRef.current) {
+      clearTimeout(graceTimerRef.current);
+      graceTimerRef.current = null;
+    }
+  }, []);
+
   const reset = useCallback(() => {
     clearTick();
+    clearGrace();
     startTimeRef.current = null;
     matchedActionRef.current = null;
     setActiveGesture(null);
     setProgress(0);
     setLabel('');
-  }, [clearTick]);
+  }, [clearTick, clearGrace]);
 
   useEffect(() => { reset(); }, [appState, reset]);
-  useEffect(() => () => clearTick(), [clearTick]);
+  useEffect(() => () => { clearTick(); clearGrace(); }, [clearTick, clearGrace]);
 
   const feedGesture = useCallback(
     (gesture: GestureType) => {
@@ -62,9 +72,18 @@ export function useGestureConfirm({
       const matched = actions.find(a => a.gesture === gesture) ?? null;
 
       if (!matched || gesture === 'none') {
-        if (matchedActionRef.current) reset();
+        if (matchedActionRef.current) {
+          if (!graceTimerRef.current) {
+            graceTimerRef.current = setTimeout(() => {
+              graceTimerRef.current = null;
+              reset();
+            }, GRACE_MS);
+          }
+        }
         return;
       }
+
+      clearGrace();
 
       if (matched.holdMs === 0) {
         cooldownUntilRef.current = now + COOLDOWN_MS;
@@ -91,6 +110,7 @@ export function useGestureConfirm({
 
         if (p >= 1) {
           clearTick();
+          clearGrace();
           cooldownUntilRef.current = Date.now() + COOLDOWN_MS;
           onConfirmed(matched.action);
           startTimeRef.current = null;
@@ -101,7 +121,7 @@ export function useGestureConfirm({
         }
       }, TICK_INTERVAL_MS);
     },
-    [appState, onConfirmed, reset, clearTick],
+    [appState, onConfirmed, reset, clearTick, clearGrace],
   );
 
   return { activeGesture, progress, label, feedGesture };
