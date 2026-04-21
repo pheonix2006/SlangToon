@@ -20,9 +20,10 @@ describe('ScriptPreview (gesture-only)', () => {
     expect(screen.getByRole('heading', { name: /No cap/ })).toBeInTheDocument();
   });
 
-  it('renders origin and explanation', () => {
+  it('renders origin and explanation separately', () => {
     render(<ScriptPreview data={mockData} />);
-    expect(screen.getByText(/Gen Z slang/)).toBeInTheDocument();
+    expect(screen.getByText('Gen Z slang')).toBeInTheDocument();
+    expect(screen.getByText('For real, not lying')).toBeInTheDocument();
   });
 
   it('renders all panels', () => {

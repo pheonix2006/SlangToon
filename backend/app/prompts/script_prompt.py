@@ -11,7 +11,7 @@ Reimagine its core meaning in a CONTEMPORARY setting (office, campus, city, soci
 {{
   "slang": "the idiom in its original language",
   "origin": "Short label, e.g. 'Latin, Horace' or 'Chinese proverb'",
-  "explanation": "One-sentence English explanation of its core meaning",
+  "explanation": "2-3 sentences in English. First explain the literal image or origin story behind the expression (e.g. the historical anecdote, fable, or metaphor it comes from). Then state what it means today in plain language. Write for someone who has never heard this expression.",
   "panel_count": 8,
   "panels": [
     {{"scene": "Under 50 words. Modern setting with vivid details (colors, lighting, expressions).", "dialogue": "Under 20 words. Natural modern speech. Can be empty string."}}
@@ -22,6 +22,7 @@ Reimagine its core meaning in a CONTEMPORARY setting (office, campus, city, soci
 1. panels array must have EXACTLY panel_count entries (8-12)
 2. All scenes in present-day with modern characters, clothing, technology
 3. Scene descriptions: under 50 words each. Dialogue: under 20 words each
+4. CRITICAL JSON RULE: Never use literal double quotes inside string values. Use single quotes instead (e.g. 'Great job!' not "Great job!"). All dialogue must go in the "dialogue" field, not embedded in "scene"
 {blacklist_section}\
 """
 
@@ -37,7 +38,7 @@ def build_system_prompt(blacklist: list[str]) -> str:
     if blacklist:
         items = "\n".join(f"   {i+1}. {s}" for i, s in enumerate(blacklist))
         blacklist_section = (
-            f"\n4. DO NOT pick any of these already-used expressions:\n"
+            f"\n5. DO NOT pick any of these already-used expressions:\n"
             f"{items}\n"
             f"   You MUST pick something DIFFERENT from this list."
         )

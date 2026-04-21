@@ -169,6 +169,26 @@ class TestExtractJson:
         with pytest.raises(LLMResponseError):
             LLMClient.extract_json_from_content(raw)
 
+    def test_json_with_surrounding_text(self) -> None:
+        raw = 'Here is the result:\n{"slang": "hello", "count": 3}\nHope this helps!'
+        result = LLMClient.extract_json_from_content(raw)
+        assert result == {"slang": "hello", "count": 3}
+
+    def test_trailing_comma_in_object(self) -> None:
+        raw = '{"slang": "hello", "count": 3,}'
+        result = LLMClient.extract_json_from_content(raw)
+        assert result == {"slang": "hello", "count": 3}
+
+    def test_trailing_comma_in_array(self) -> None:
+        raw = '{"panels": [1, 2, 3,]}'
+        result = LLMClient.extract_json_from_content(raw)
+        assert result == {"panels": [1, 2, 3]}
+
+    def test_json_with_text_before_code_block(self) -> None:
+        raw = '以下是生成结果：\n```json\n{"slang": "test"}\n```\n请查看。'
+        result = LLMClient.extract_json_from_content(raw)
+        assert result == {"slang": "test"}
+
 
 # ---------------------------------------------------------------------------
 # chat_with_vision — 成功调用

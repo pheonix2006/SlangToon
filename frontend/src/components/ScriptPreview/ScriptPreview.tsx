@@ -18,7 +18,13 @@ export default function ScriptPreview({ data }: ScriptPreviewProps) {
           className="text-[10px] tracking-[0.15em] mt-2 font-display"
           style={{ color: 'rgba(255,183,77,0.3)' }}
         >
-          {data.origin} · {data.explanation}
+          {data.origin}
+        </p>
+        <p
+          className="text-xs leading-relaxed mt-2 max-w-xl mx-auto"
+          style={{ color: 'rgba(255,255,255,0.55)' }}
+        >
+          {data.explanation}
         </p>
       </div>
 

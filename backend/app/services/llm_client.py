@@ -258,28 +258,34 @@ class LLMClient:
         1. 纯 JSON 字符串
         2. 被 ```json ... ``` 包裹的 Markdown 代码块
         3. 被 ``` ... ``` 包裹的通用代码块
+        4. JSON 前后混有解释文字
+        5. 尾部逗号等常见 LLM 格式瑕疵
         """
+        logger.debug("LLM 原始响应 (len=%d):\n%s", len(content), content)
         text = content.strip()
 
-        # 尝试直接解析
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            pass
+        # 策略 1: 直接解析
+        result = _try_parse_json(text)
+        if result is not None:
+            return result
 
-        # 尝试从 ```json ... ``` 中提取
-        md_match = re.search(
-            r"```(?:json)?\s*\n?(.*?)```",
-            text,
-            re.DOTALL,
-        )
+        # 策略 2: 从 ```json ... ``` / ``` ... ``` 代码块提取
+        md_match = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL)
         if md_match:
-            try:
-                return json.loads(md_match.group(1).strip())
-            except json.JSONDecodeError:
-                pass
+            result = _try_parse_json(md_match.group(1).strip())
+            if result is not None:
+                return result
 
-        raise LLMResponseError(f"无法从 LLM 响应中提取有效 JSON: {content[:200]}")
+        # 策略 3: 提取第一个 { ... } 块（处理 JSON 前后有解释文字）
+        brace_match = re.search(r"\{.*\}", text, re.DOTALL)
+        if brace_match:
+            result = _try_parse_json(brace_match.group(0))
+            if result is not None:
+                return result
+
+        raise LLMResponseError(
+            f"无法从 LLM 响应中提取有效 JSON (len={len(content)}): {content[:500]}"
+        )
 
     # ------------------------------------------------------------------
     # 内部工具
@@ -376,3 +382,28 @@ class LLMClient:
         import asyncio
         delay = base * (2 ** (attempt - 1))
         await asyncio.sleep(delay)
+
+
+def _try_parse_json(text: str) -> dict | None:
+    """尝试解析 JSON，容忍尾部逗号、未转义引号等常见 LLM 格式瑕疵。"""
+    # 直接解析
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # 移除尾部逗号后重试: ,] → ] 和 ,} → }
+    cleaned = re.sub(r",\s*([}\]])", r"\1", text)
+    if cleaned != text:
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            pass
+    # json-repair 兜底：处理未转义引号、缺失括号等
+    try:
+        from json_repair import repair_json
+        result = repair_json(text, return_objects=True)
+        if isinstance(result, dict):
+            return result
+    except Exception:
+        pass
+    return None

@@ -15,6 +15,7 @@ dependencies = [
     "tiktoken>=0.7.0",
     "langgraph>=1.1.6",
     "langchain-core>=1.2.26",
+    "json-repair>=0.59.4",
 ]
 
 [dependency-groups]
