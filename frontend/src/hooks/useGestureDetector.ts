@@ -4,9 +4,9 @@ import type { NormalizedLandmark } from '../utils/gestureAlgo';
 import { detectGesture, createWaveBuffer, detectWave } from '../utils/gestureAlgo';
 
 const DEFAULT_DEBOUNCE_FRAMES = 3;
-const WAVE_BUFFER_SIZE = 15;
+const WAVE_BUFFER_SIZE = 10;
 const WAVE_THRESHOLD = 0.12;
-const WAVE_COOLDOWN_FRAMES = 45;
+const WAVE_COOLDOWN_FRAMES = 30;
 
 interface UseGestureDetectorOptions {
   debounceFrames?: number;
@@ -44,6 +44,12 @@ export function useGestureDetector(
 
       if (waveCooldownRef.current > 0) waveCooldownRef.current -= 1;
 
+      if (waveCooldownRef.current <= 0 && detectWave(waveBufferRef.current, WAVE_THRESHOLD)) {
+        onWaveDetected?.();
+        waveBufferRef.current.clear();
+        waveCooldownRef.current = WAVE_COOLDOWN_FRAMES;
+      }
+
       if (gesture === 'none') {
         if (pendingGestureRef.current === 'none') {
           counterRef.current += 1;
@@ -57,16 +63,8 @@ export function useGestureDetector(
           setCurrentGesture('none');
           setCurrentConfidence(0);
         }
-
-        if (waveCooldownRef.current <= 0 && detectWave(waveBufferRef.current, WAVE_THRESHOLD)) {
-          onWaveDetected?.();
-          waveBufferRef.current.clear();
-          waveCooldownRef.current = WAVE_COOLDOWN_FRAMES;
-        }
         return;
       }
-
-      waveBufferRef.current.clear();
 
       if (gesture === pendingGestureRef.current) {
         counterRef.current += 1;

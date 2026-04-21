@@ -208,7 +208,7 @@ describe('detectGesture', () => {
 });
 
 describe('Wave detection', () => {
-  const BUF = 15;
+  const BUF = 10;
 
   it('returns false when buffer not full', () => {
     const buf = createWaveBuffer(BUF);

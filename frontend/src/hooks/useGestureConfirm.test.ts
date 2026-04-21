@@ -34,11 +34,11 @@ describe('useGestureConfirm', () => {
       useGestureConfirm({ appState: AppState.CAMERA_READY, onConfirmed }),
     );
     act(() => result.current.feedGesture('ok'));
-    act(() => { vi.advanceTimersByTime(1500); });
+    act(() => { vi.advanceTimersByTime(1000); });
     expect(result.current.progress).toBeGreaterThan(0.4);
     expect(result.current.progress).toBeLessThan(0.6);
     expect(onConfirmed).not.toHaveBeenCalled();
-    act(() => { vi.advanceTimersByTime(1500); });
+    act(() => { vi.advanceTimersByTime(1000); });
     expect(onConfirmed).toHaveBeenCalledWith('generateScript');
   });
 
@@ -48,7 +48,7 @@ describe('useGestureConfirm', () => {
       useGestureConfirm({ appState: AppState.CAMERA_READY, onConfirmed }),
     );
     act(() => result.current.feedGesture('ok'));
-    act(() => { vi.advanceTimersByTime(1500); });
+    act(() => { vi.advanceTimersByTime(1000); });
     act(() => result.current.feedGesture('none'));
     expect(result.current.activeGesture).toBeNull();
     expect(result.current.progress).toBe(0);
@@ -91,7 +91,7 @@ describe('useGestureConfirm', () => {
       useGestureConfirm({ appState: AppState.CAMERA_READY, onConfirmed }),
     );
     act(() => result.current.feedGesture('ok'));
-    act(() => { vi.advanceTimersByTime(3000); });
+    act(() => { vi.advanceTimersByTime(2000); });
     expect(onConfirmed).toHaveBeenCalledTimes(1);
     act(() => result.current.feedGesture('ok'));
     act(() => { vi.advanceTimersByTime(500); });
@@ -108,7 +108,7 @@ describe('useGestureConfirm', () => {
       { initialProps: { state: AppState.CAMERA_READY as AppState } },
     );
     act(() => result.current.feedGesture('ok'));
-    act(() => { vi.advanceTimersByTime(1500); });
+    act(() => { vi.advanceTimersByTime(1000); });
     expect(result.current.progress).toBeGreaterThan(0);
     rerender({ state: AppState.SCRIPT_LOADING });
     expect(result.current.activeGesture).toBeNull();
@@ -122,7 +122,7 @@ describe('useGestureConfirm', () => {
     );
     act(() => result.current.feedGesture('ok'));
     expect(result.current.label).toBe('Create Comic');
-    act(() => { vi.advanceTimersByTime(3000); });
+    act(() => { vi.advanceTimersByTime(2000); });
     expect(onConfirmed).toHaveBeenCalledWith('generateComic');
   });
 
@@ -133,7 +133,7 @@ describe('useGestureConfirm', () => {
     );
     act(() => result.current.feedGesture('open_palm'));
     expect(result.current.label).toBe('Reshuffle');
-    act(() => { vi.advanceTimersByTime(3000); });
+    act(() => { vi.advanceTimersByTime(2000); });
     expect(onConfirmed).toHaveBeenCalledWith('reshuffleScript');
   });
 });

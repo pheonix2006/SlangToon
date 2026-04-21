@@ -137,7 +137,7 @@ export function createWaveBuffer(capacity: number): WaveBuffer {
  */
 export function detectWave(buf: WaveBuffer, threshold: number): boolean {
   const data = buf.toArray();
-  if (data.length < 10) return false;
+  if (data.length < 8) return false;
   let min = Infinity, max = -Infinity;
   for (const v of data) {
     if (!Number.isFinite(v)) continue;

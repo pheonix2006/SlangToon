@@ -105,7 +105,7 @@ describe('useGestureDetector (frame-level output)', () => {
   it('detects wave via onWaveDetected callback', () => {
     const onWave = vi.fn();
     const { result } = renderHook(() => useGestureDetector({ onWaveDetected: onWave }));
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 10; i++) {
       const landmarks = makeNoneLandmarks();
       landmarks[0].x = 0.4 + 0.1 * Math.sin(i * Math.PI / 3);
       act(() => result.current.processLandmarks(landmarks));
@@ -116,13 +116,13 @@ describe('useGestureDetector (frame-level output)', () => {
   it('wave cooldown prevents rapid re-trigger', () => {
     const onWave = vi.fn();
     const { result } = renderHook(() => useGestureDetector({ onWaveDetected: onWave }));
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 10; i++) {
       const landmarks = makeNoneLandmarks();
       landmarks[0].x = 0.4 + 0.1 * Math.sin(i * Math.PI / 3);
       act(() => result.current.processLandmarks(landmarks));
     }
     expect(onWave).toHaveBeenCalledTimes(1);
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 10; i++) {
       const landmarks = makeNoneLandmarks();
       landmarks[0].x = 0.4 + 0.1 * Math.sin(i * Math.PI / 3);
       act(() => result.current.processLandmarks(landmarks));
