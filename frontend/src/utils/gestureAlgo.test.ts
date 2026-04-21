@@ -2,12 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { detectGesture, type NormalizedLandmark } from './gestureAlgo';
 import { createWaveBuffer, detectWave } from './gestureAlgo';
 
-/**
- * Helper: create 21 NormalizedLandmark objects with sensible defaults.
- *
- * Default positions simulate a hand facing the camera with all fingers extended
- * (open palm). Pass overrides to customize specific landmarks.
- */
 function makeLandmarks(
   overrides: Partial<Record<number, Partial<NormalizedLandmark>>> = {},
 ): NormalizedLandmark[] {
@@ -68,29 +62,20 @@ describe('detectGesture', () => {
     expect(result.confidence).toBe(0);
   });
 
-  it('detects OK gesture when thumb+index form circle and other fingers extended', () => {
+  it('detects OK gesture when thumb tip close to index tip and other fingers extended', () => {
     const landmarks = makeLandmarks({
-      // Thumb curled toward index MCP, close to index tip
-      4: { x: 0.38, y: 0.62, z: 0 },  // THUMB_TIP curled
+      // Thumb curled toward index — NOT extended (closer to INDEX_MCP than THUMB_IP)
+      4: { x: 0.38, y: 0.62, z: 0 },  // THUMB_TIP
       8: { x: 0.39, y: 0.63, z: 0 },  // INDEX_TIP curled, close to thumb
-      3: { x: 0.3, y: 0.5, z: 0 },    // THUMB_IP further from INDEX_MCP
+      3: { x: 0.3, y: 0.5, z: 0 },    // THUMB_IP
     });
     const result = detectGesture(landmarks);
     expect(result.gesture).toBe('ok');
     expect(result.confidence).toBeGreaterThan(0);
   });
 
-  it('does not detect OK when index is extended (palm-like)', () => {
-    const landmarks = makeLandmarks({
-      // Thumb and index tips close, but index is extended (y < pip.y)
-      4: { x: 0.35, y: 0.3, z: 0 },
-      8: { x: 0.35, y: 0.31, z: 0.001 },
-    });
-    const result = detectGesture(landmarks);
-    expect(result.gesture).not.toBe('ok');
-  });
-
-  it('detects open_palm when all 5 fingers are extended', () => {
+  it('detects open_palm over OK when all 5 fingers are extended', () => {
+    // Even with thumb/index tips somewhat close, palm wins if all fingers extended
     const landmarks = makeLandmarks({
       4: { x: 0.1, y: 0.3, z: 0 },
       3: { x: 0.3, y: 0.5, z: 0 },
@@ -115,12 +100,12 @@ describe('detectGesture', () => {
   it('OK gesture confidence increases as thumb-index distance decreases', () => {
     const far = makeLandmarks({
       4: { x: 0.38, y: 0.62, z: 0 },
-      8: { x: 0.38, y: 0.66, z: 0 },  // further from thumb
+      8: { x: 0.38, y: 0.66, z: 0 },
       3: { x: 0.3, y: 0.5, z: 0 },
     });
     const near = makeLandmarks({
       4: { x: 0.38, y: 0.62, z: 0 },
-      8: { x: 0.38, y: 0.621, z: 0 }, // very close to thumb
+      8: { x: 0.38, y: 0.621, z: 0 },
       3: { x: 0.3, y: 0.5, z: 0 },
     });
 
@@ -165,6 +150,17 @@ describe('detectGesture', () => {
       expect(result.confidence).toBeGreaterThanOrEqual(0);
       expect(result.confidence).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('palm has priority: extended fingers with close tips still returns palm', () => {
+    // All fingers extended but thumb/index tips happen to be close
+    const landmarks = makeLandmarks({
+      4: { x: 0.34, y: 0.3, z: 0 },  // THUMB_TIP near index tip
+      8: { x: 0.35, y: 0.3, z: 0 },  // INDEX_TIP
+      3: { x: 0.3, y: 0.5, z: 0 },   // THUMB_IP
+    });
+    const result = detectGesture(landmarks);
+    expect(result.gesture).toBe('open_palm');
   });
 });
 

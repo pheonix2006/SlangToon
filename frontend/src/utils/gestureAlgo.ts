@@ -53,31 +53,11 @@ export function detectGesture(
   const ringExtended = isFingerExtended(landmarks, RING_TIP, RING_PIP);
   const pinkyExtended = isFingerExtended(landmarks, PINKY_TIP, PINKY_PIP);
   const indexExtended = isFingerExtended(landmarks, INDEX_TIP, INDEX_PIP);
-  const thumbCurled =
-    distance(landmarks[THUMB_TIP], landmarks[INDEX_MCP]) <
-    distance(landmarks[THUMB_IP], landmarks[INDEX_MCP]);
-
-  // OK sign: thumb+index form a circle, other 3 fingers extended
-  const thumbTipToIndexTip = distance(landmarks[THUMB_TIP], landmarks[INDEX_TIP]);
-  const okThreshold = 0.05;
-
-  if (
-    thumbTipToIndexTip < okThreshold &&
-    !indexExtended &&
-    thumbCurled &&
-    middleExtended &&
-    ringExtended &&
-    pinkyExtended
-  ) {
-    const confidence = Math.max(0, 1 - thumbTipToIndexTip / okThreshold);
-    return { gesture: 'ok', confidence };
-  }
-
-  // Open palm: all 5 fingers extended
   const thumbExtended =
     distance(landmarks[THUMB_TIP], landmarks[INDEX_MCP]) >
     distance(landmarks[THUMB_IP], landmarks[INDEX_MCP]);
 
+  // Palm checked FIRST: all 5 fingers extended → palm wins over OK
   if (
     thumbExtended &&
     indexExtended &&
@@ -85,15 +65,21 @@ export function detectGesture(
     ringExtended &&
     pinkyExtended
   ) {
-    const fingerCount = [
-      thumbExtended,
-      indexExtended,
-      middleExtended,
-      ringExtended,
-      pinkyExtended,
-    ].filter(Boolean).length;
-    const confidence = fingerCount / 5;
-    return { gesture: 'open_palm', confidence };
+    return { gesture: 'open_palm', confidence: 1 };
+  }
+
+  // OK sign: thumb+index tips close, other 3 fingers extended
+  const thumbTipToIndexTip = distance(landmarks[THUMB_TIP], landmarks[INDEX_TIP]);
+  const okThreshold = 0.06;
+
+  if (
+    thumbTipToIndexTip < okThreshold &&
+    middleExtended &&
+    ringExtended &&
+    pinkyExtended
+  ) {
+    const confidence = Math.max(0, 1 - thumbTipToIndexTip / okThreshold);
+    return { gesture: 'ok', confidence };
   }
 
   return { gesture: 'none', confidence: 0 };
