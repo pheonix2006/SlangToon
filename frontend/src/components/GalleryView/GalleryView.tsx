@@ -72,6 +72,12 @@ export default function GalleryView({ items, intervalMs = 8000 }: GalleryViewPro
         />
       </div>
 
+      {/* Bottom gradient for label readability */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-48 pointer-events-none"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)' }}
+      />
+
       {/* Museum label — bottom-left */}
       <div
         className="absolute bottom-8 left-8 z-10 flex flex-col gap-2 transition-opacity duration-[1500ms] ease-in-out"
