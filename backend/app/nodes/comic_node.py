@@ -9,7 +9,7 @@ from app.services.image_gen_client import ImageGenClient
 
 logger = logging.getLogger(__name__)
 
-COMIC_SIZE = "1536*2688"
+COMIC_SIZE = "2688*1536"
 
 
 async def comic_node(state: WorkflowState, config: RunnableConfig) -> dict:

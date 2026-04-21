@@ -30,11 +30,10 @@ def _truncate_prompt_to_tokens(text: str, max_tokens: int, encoding_name: str = 
 def _get_layout(panel_count: int) -> str:
     """Return layout description for the given panel count."""
     layouts = {
-        8: "2x4 grid (2 rows, 4 columns)",
-        9: "3x3 grid",
-        10: "2x5 grid (2 rows, 5 columns)",
-        11: "3x4 grid (last row 3 panels)",
-        12: "3x4 grid (3 rows, 4 columns)",
+        3: "1x3 grid (1 row, 3 columns)",
+        4: "2x2 grid (2 rows, 2 columns)",
+        5: "2+3 grid (2 top, 3 bottom)",
+        6: "2x3 grid (2 rows, 3 columns)",
     }
     return layouts.get(panel_count, f"{panel_count}-panel grid")
 
@@ -91,7 +90,7 @@ def build_comic_prompt(
 
     # Fixed parts of the prompt
     header = (
-        f"A {panel_count}-panel {layout} manga comic strip, 9:16 portrait. "
+        f"A {panel_count}-panel {layout} manga comic strip, 16:9 landscape. "
         f'Title: "{slang}" ({origin}). All scenes in modern setting. '
     )
     footer = (

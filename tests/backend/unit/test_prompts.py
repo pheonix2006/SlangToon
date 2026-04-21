@@ -31,10 +31,6 @@ class TestBuildComicPrompt:
             {"scene": "The cat sees a bird outside", "dialogue": ""},
             {"scene": "Cat chases the bird", "dialogue": "Narrator: The hunt begins"},
             {"scene": "Cat napping after failed chase", "dialogue": ""},
-            {"scene": "Cat sits on a windowsill again", "dialogue": ""},
-            {"scene": "The cat sees a bird outside", "dialogue": ""},
-            {"scene": "Cat chases the bird again", "dialogue": ""},
-            {"scene": "Cat napping after failed chase again", "dialogue": ""},
         ]
         prompt = build_comic_prompt(
             slang="Curiosity killed the cat",
@@ -44,14 +40,15 @@ class TestBuildComicPrompt:
         )
         assert "Curiosity killed the cat" in prompt
         assert "manga" in prompt
-        assert "8-panel" in prompt
+        assert "4-panel" in prompt
+        assert "2x2" in prompt
+        assert "16:9" in prompt
         assert "Cat: Meow" in prompt
 
     def test_prompt_within_token_limit(self):
-        """Prompt must never exceed MAX_PROMPT_TOKENS (950, API limit 1000)."""
         panels = [
             {"scene": "x" * 200, "dialogue": "y" * 100}
-        ] * 12
+        ] * 4
         prompt = build_comic_prompt(
             slang="test-slang", origin="test-origin", explanation="test",
             panels=panels,
@@ -59,33 +56,24 @@ class TestBuildComicPrompt:
         assert count_tokens(prompt) <= MAX_PROMPT_TOKENS
 
     def test_all_panels_present_in_prompt(self):
-        """Even with 12 panels, all should be mentioned (P1..P12)."""
         panels = [
             {"scene": f"Scene {i} description with some detail", "dialogue": f"Line {i}"}
-            for i in range(1, 13)
+            for i in range(1, 5)
         ]
         prompt = build_comic_prompt("test", "test", "test", panels)
-        for i in range(1, 13):
+        for i in range(1, 5):
             assert f"P{i}:" in prompt, f"Panel {i} missing from prompt"
 
-    def test_layout_description_varies_by_panel_count(self):
-        p8 = [{"scene": "x", "dialogue": ""}] * 8
-        p9 = [{"scene": "x", "dialogue": ""}] * 9
-        p12 = [{"scene": "x", "dialogue": ""}] * 12
-
-        prompt8 = build_comic_prompt("s", "o", "e", p8)
-        prompt9 = build_comic_prompt("s", "o", "e", p9)
-        prompt12 = build_comic_prompt("s", "o", "e", p12)
-
-        assert "2x4 grid" in prompt8
-        assert "3x3 grid" in prompt9
-        assert "3x4 grid (3 rows" in prompt12
+    def test_layout_description_for_4_panels(self):
+        p4 = [{"scene": "x", "dialogue": ""}] * 4
+        prompt = build_comic_prompt("s", "o", "e", p4)
+        assert "2x2 grid" in prompt
+        assert "16:9" in prompt
 
     def test_dialogue_truncation(self):
         panels = [{"scene": "short", "dialogue": "a" * 100}]
         prompt = build_comic_prompt("s", "o", "e", panels)
         assert count_tokens(prompt) <= MAX_PROMPT_TOKENS
-        # Verify dialogue is still present after truncation
         assert "P1:" in prompt
 
     def test_scene_truncation(self):
@@ -93,14 +81,13 @@ class TestBuildComicPrompt:
         prompt = build_comic_prompt("s", "o", "e", panels)
         assert count_tokens(prompt) <= MAX_PROMPT_TOKENS
 
-    def test_progressive_compression_with_many_panels(self):
-        """12 panels with long text should still fit via progressive compression."""
+    def test_progressive_compression_with_4_panels(self):
         panels = [
             {
                 "scene": "A detailed visual description of a complex modern scene with multiple characters",
                 "dialogue": "Character says something important about the plot development",
             }
-            for _ in range(12)
+            for _ in range(4)
         ]
         prompt = build_comic_prompt(
             slang="塞翁失马",
@@ -109,8 +96,7 @@ class TestBuildComicPrompt:
             panels=panels,
         )
         assert count_tokens(prompt) <= MAX_PROMPT_TOKENS
-        # All 12 panels should still be present
-        for i in range(1, 13):
+        for i in range(1, 5):
             assert f"P{i}:" in prompt
 
 
