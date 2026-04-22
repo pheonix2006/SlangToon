@@ -5,7 +5,7 @@ import { useCamera } from './hooks/useCamera';
 import { useGestureDetector } from './hooks/useGestureDetector';
 import { useGestureConfirm } from './hooks/useGestureConfirm';
 import { useMediaPipeHands } from './hooks/useMediaPipeHands';
-import { generateScript, generateComic, getHistory, fetchConfig } from './services/api';
+import { generateScriptStream, generateComic, getHistory, fetchConfig } from './services/api';
 import GlowBackground from './components/GlowBackground/GlowBackground';
 import PageTransition from './components/PageTransition';
 import CameraView from './components/CameraView/CameraView';
@@ -17,6 +17,7 @@ import GestureProgressRing from './components/GestureProgressRing/GestureProgres
 import GestureHint from './components/GestureHint/GestureHint';
 import ErrorDisplay from './components/ErrorDisplay';
 import LoadingOrb from './components/LoadingOrb';
+import ThinkingDisplay from './components/ThinkingDisplay/ThinkingDisplay';
 
 function App() {
   const [appState, setAppState] = useState<AppState>(AppState.CAMERA_READY);
@@ -26,7 +27,10 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [galleryItems, setGalleryItems] = useState<HistoryItem[]>([]);
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [thinkingText, setThinkingText] = useState('');
+  const [generatingPhase, setGeneratingPhase] = useState<'thinking' | 'comic'>('thinking');
 
   const appStateRef = useRef<AppState>(appState);
   const setAppStateSync = useCallback((newState: AppState) => {
@@ -75,17 +79,36 @@ function App() {
   const handleGenerate = useCallback(async (capturedImage: string) => {
     setReferenceImage(capturedImage);
     setError(null);
+    setThinkingText('');
+    setGeneratingPhase('thinking');
     setAppStateSync(AppState.GENERATING);
-    try {
-      const scriptResponse = await generateScript();
-      setScriptData(scriptResponse.data);
 
+    try {
+      let scriptResult: ScriptData | null = null;
+
+      await generateScriptStream(
+        (text) => setThinkingText((prev) => prev + text),
+        (data) => {
+          scriptResult = data;
+          setScriptData(data);
+          setGeneratingPhase('comic');
+        },
+        (msg) => {
+          throw new Error(msg);
+        },
+      );
+
+      if (!scriptResult) {
+        throw new Error('No script data received');
+      }
+
+      const script = scriptResult as ScriptData;
       const comicResponse = await generateComic({
-        slang: scriptResponse.data.slang,
-        origin: scriptResponse.data.origin,
-        explanation: scriptResponse.data.explanation,
-        panel_count: scriptResponse.data.panel_count,
-        panels: scriptResponse.data.panels,
+        slang: script.slang,
+        origin: script.origin,
+        explanation: script.explanation,
+        panel_count: script.panel_count,
+        panels: script.panels,
         reference_image: capturedImage,
       });
       setComicUrl(comicResponse.data.comic_url);
@@ -231,10 +254,16 @@ function App() {
                   retryText="Try Again"
                 />
               ) : (
-                <LoadingOrb
-                  label="CREATING"
-                  subtext="正在为你创作漫画..."
-                />
+                <>
+                  <LoadingOrb
+                    label={generatingPhase === 'thinking' ? 'THINKING' : 'CREATING'}
+                    subtext={generatingPhase === 'thinking' ? 'AI 正在构思剧本...' : '正在生成漫画...'}
+                  />
+                  <ThinkingDisplay
+                    text={thinkingText}
+                    isActive={generatingPhase === 'thinking'}
+                  />
+                </>
               )}
             </div>
           </PageTransition>
