@@ -18,7 +18,7 @@ export default function ThinkingDisplay({ text, isActive }: ThinkingDisplayProps
 
   return (
     <div
-      className={`w-full max-w-3xl mx-auto mt-6 px-4 transition-opacity duration-500 ${
+      className={`w-full mt-6 px-8 transition-opacity duration-500 ${
         isActive ? 'opacity-100' : 'opacity-0'
       }`}
     >
