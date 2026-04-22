@@ -145,6 +145,7 @@ export async function generateComic(
     explanation: string;
     panel_count: number;
     panels: { scene: string; dialogue: string }[];
+    reference_image?: string;
   },
 ): Promise<ComicResponse> {
   return request<ComicResponse>(
