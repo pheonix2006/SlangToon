@@ -24,7 +24,7 @@ describe('useGestureConfirm', () => {
     );
     act(() => result.current.feedGesture('ok'));
     expect(result.current.activeGesture).toBe('ok');
-    expect(result.current.label).toBe('Generate');
+    expect(result.current.label).toBe('Take Photo');
   });
 
   it('progress increases over time and triggers at holdMs', () => {
@@ -38,7 +38,7 @@ describe('useGestureConfirm', () => {
     expect(result.current.progress).toBeLessThan(0.6);
     expect(onConfirmed).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(1000); });
-    expect(onConfirmed).toHaveBeenCalledWith('generateScript');
+    expect(onConfirmed).toHaveBeenCalledWith('startCountdown');
   });
 
   it('does not reset immediately on brief gesture drop (grace period)', () => {
@@ -61,7 +61,7 @@ describe('useGestureConfirm', () => {
 
     // Progress should continue, not reset
     act(() => { vi.advanceTimersByTime(1000); });
-    expect(onConfirmed).toHaveBeenCalledWith('generateScript');
+    expect(onConfirmed).toHaveBeenCalledWith('startCountdown');
   });
 
   it('resets after grace period expires without gesture recovery', () => {
@@ -95,7 +95,7 @@ describe('useGestureConfirm', () => {
   it('locked states ignore all gestures', () => {
     const onConfirmed = vi.fn();
     const { result } = renderHook(() =>
-      useGestureConfirm({ appState: AppState.SCRIPT_LOADING, onConfirmed }),
+      useGestureConfirm({ appState: AppState.GENERATING, onConfirmed }),
     );
     act(() => result.current.feedGesture('ok'));
     expect(result.current.activeGesture).toBeNull();
@@ -137,30 +137,8 @@ describe('useGestureConfirm', () => {
     act(() => result.current.feedGesture('ok'));
     act(() => { vi.advanceTimersByTime(1000); });
     expect(result.current.progress).toBeGreaterThan(0);
-    rerender({ state: AppState.SCRIPT_LOADING });
+    rerender({ state: AppState.GENERATING });
     expect(result.current.activeGesture).toBeNull();
     expect(result.current.progress).toBe(0);
-  });
-
-  it('SCRIPT_PREVIEW: ok triggers generateComic', () => {
-    const onConfirmed = vi.fn();
-    const { result } = renderHook(() =>
-      useGestureConfirm({ appState: AppState.SCRIPT_PREVIEW, onConfirmed }),
-    );
-    act(() => result.current.feedGesture('ok'));
-    expect(result.current.label).toBe('Create Comic');
-    act(() => { vi.advanceTimersByTime(2000); });
-    expect(onConfirmed).toHaveBeenCalledWith('generateComic');
-  });
-
-  it('SCRIPT_PREVIEW: open_palm triggers reshuffleScript', () => {
-    const onConfirmed = vi.fn();
-    const { result } = renderHook(() =>
-      useGestureConfirm({ appState: AppState.SCRIPT_PREVIEW, onConfirmed }),
-    );
-    act(() => result.current.feedGesture('open_palm'));
-    expect(result.current.label).toBe('Reshuffle');
-    act(() => { vi.advanceTimersByTime(2000); });
-    expect(onConfirmed).toHaveBeenCalledWith('reshuffleScript');
   });
 });

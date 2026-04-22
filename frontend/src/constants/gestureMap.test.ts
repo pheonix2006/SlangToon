@@ -9,22 +9,15 @@ describe('GESTURE_MAP', () => {
     }
   });
 
-  it('SCRIPT_LOADING and COMIC_GENERATING are locked (empty)', () => {
-    expect(GESTURE_MAP[AppState.SCRIPT_LOADING]).toEqual([]);
-    expect(GESTURE_MAP[AppState.COMIC_GENERATING]).toEqual([]);
+  it('COUNTDOWN and GENERATING are locked (empty)', () => {
+    expect(GESTURE_MAP[AppState.COUNTDOWN]).toEqual([]);
+    expect(GESTURE_MAP[AppState.GENERATING]).toEqual([]);
   });
 
   it('CAMERA_READY has ok gesture with 2000ms hold', () => {
     const actions = GESTURE_MAP[AppState.CAMERA_READY];
     expect(actions).toHaveLength(1);
-    expect(actions[0]).toMatchObject({ gesture: 'ok', holdMs: 2000, action: 'generateScript' });
-  });
-
-  it('SCRIPT_PREVIEW has ok and open_palm gestures', () => {
-    const actions = GESTURE_MAP[AppState.SCRIPT_PREVIEW];
-    expect(actions).toHaveLength(2);
-    expect(actions.find(a => a.gesture === 'ok')).toMatchObject({ action: 'generateComic', holdMs: 2000 });
-    expect(actions.find(a => a.gesture === 'open_palm')).toMatchObject({ action: 'reshuffleScript', holdMs: 2000 });
+    expect(actions[0]).toMatchObject({ gesture: 'ok', holdMs: 2000, action: 'startCountdown' });
   });
 
   it('COMIC_READY has ok gesture for startNew', () => {

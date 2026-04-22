@@ -7,13 +7,7 @@ describe('GestureHint', () => {
   it('shows ok hint for CAMERA_READY', () => {
     render(<GestureHint appState={AppState.CAMERA_READY} />);
     expect(screen.getByText(/👌/)).toBeInTheDocument();
-    expect(screen.getByText(/Generate/)).toBeInTheDocument();
-  });
-
-  it('shows ok and palm hints for SCRIPT_PREVIEW', () => {
-    render(<GestureHint appState={AppState.SCRIPT_PREVIEW} />);
-    expect(screen.getByText(/👌/)).toBeInTheDocument();
-    expect(screen.getByText(/🖐️/)).toBeInTheDocument();
+    expect(screen.getByText(/Take Photo/)).toBeInTheDocument();
   });
 
   it('shows ok hint for COMIC_READY', () => {
@@ -23,12 +17,17 @@ describe('GestureHint', () => {
   });
 
   it('renders nothing for locked states', () => {
-    const { container } = render(<GestureHint appState={AppState.SCRIPT_LOADING} />);
+    const { container } = render(<GestureHint appState={AppState.GENERATING} />);
     expect(container.textContent).toBe('');
   });
 
   it('renders nothing for GALLERY', () => {
     const { container } = render(<GestureHint appState={AppState.GALLERY} />);
+    expect(container.textContent).toBe('');
+  });
+
+  it('renders nothing for COUNTDOWN', () => {
+    const { container } = render(<GestureHint appState={AppState.COUNTDOWN} />);
     expect(container.textContent).toBe('');
   });
 });
