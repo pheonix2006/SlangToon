@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     qwen_image_max_retries: int = 3
 
     # Image generation provider switch
-    image_gen_provider: str = "dashscope"  # "dashscope" | "openrouter" | "replicate" | "openai"
+    image_gen_provider: str = "dashscope"  # "dashscope" | "openrouter" | "replicate"
 
     # OpenRouter image generation
     openrouter_image_apikey: str = ""
@@ -48,13 +48,6 @@ class Settings(BaseSettings):
     replicate_image_timeout: int = 120
     replicate_image_max_retries: int = 3
     replicate_image_extra_params: str = ""  # JSON string, e.g. '{"quality":"auto","moderation":"auto"}'
-
-    # OpenAI image generation
-    openai_image_apikey: str = ""
-    openai_image_base_url: str = "https://api.openai.com/v1"
-    openai_image_model: str = "gpt-image-1"
-    openai_image_timeout: int = 120
-    openai_image_max_retries: int = 3
 
     # 存储
     comic_storage_dir: str = "data/comics"

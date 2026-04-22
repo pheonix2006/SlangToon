@@ -1,4 +1,4 @@
-"""完整流程对比测试 — Qwen / Gemini / OpenAI 三模型图生图效果对比。
+"""完整流程对比测试 — Qwen / Gemini / Replicate 三模型图生图效果对比。
 
 用法:
     cd backend
@@ -55,7 +55,7 @@ FIXED_SCRIPT_DATA = {
 PROVIDERS = [
     ("dashscope", "qwen"),
     ("openrouter", "gemini"),
-    ("openai", "openai"),
+    ("replicate", "replicate"),
 ]
 
 

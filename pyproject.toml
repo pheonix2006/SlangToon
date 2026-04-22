@@ -16,6 +16,7 @@ dependencies = [
     "langgraph>=1.1.6",
     "langchain-core>=1.2.26",
     "json-repair>=0.59.4",
+    "replicate>=1.0.0",
 ]
 
 [dependency-groups]

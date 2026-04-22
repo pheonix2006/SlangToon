@@ -56,14 +56,36 @@ class OpenRouterProvider:
     async def generate(
         self, prompt: str, image_base64: str, size: ImageSize
     ) -> str:
-        """图生图 — OpenRouter 不支持，抛出异常。"""
-        raise ImageGenApiError(
-            "OpenRouter does not support image-to-image generation"
-        )
+        """图生图 — 通过 image_url content part 传入参考图。"""
+        image_url = self._ensure_data_url(image_base64)
+        payload: dict = {
+            "model": self._model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": image_url}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
+            "modalities": ["image", "text"],
+            "image_config": self._convert_size(size),
+        }
+        logger.info("OpenRouter 图生图 (model=%s)", self._model)
+        data = await self._request(payload)
+        return self._parse_response(data)
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _ensure_data_url(image_base64: str) -> str:
+        """确保 base64 字符串带 data:image/...;base64, 前缀。"""
+        if image_base64.startswith("data:image/"):
+            return image_base64
+        return f"data:image/jpeg;base64,{image_base64}"
 
     @staticmethod
     def _convert_size(size: ImageSize) -> dict:

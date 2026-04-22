@@ -1,482 +1,321 @@
-# SlangToon - AI 俚语漫画生成器
+# SlangToon - AI Slang Comic Generator
 
-> 基于 SOLID、KISS、DRY、YAGNI 原则的开发指南
+> SOLID / KISS / DRY / YAGNI
 
-## 目录
+## Project Overview
 
-- [项目概览](#项目概览)
-- [代码导航策略](#代码导航策略)
-- [项目结构约定](#项目结构约定)
-- [API 规范](#api-规范)
-- [测试规范](#测试规范)
-- [代码质量标准](#代码质量标准)
-- [快速命令参考](#快速命令参考)
-- [检查清单](#检查清单)
+**SlangToon** is an AI-powered slang comic generator + **art gallery** for exhibition: user makes OK gesture via camera -> GLM-4.6V generates random slang (auto-deduplicated) + 3-6 panel comic script -> user previews script -> confirmed -> Qwen Image 2.0 generates comic strip -> display/download. **Idle 20s auto-enters art gallery mode**, Wave gesture to wake.
 
----
+### Tech Stack
 
-## 项目概览
+| Layer | Tech |
+|-------|------|
+| Frontend | React 19, TypeScript 5.7 (strict), Vite 6, Tailwind CSS 4 |
+| Backend | FastAPI, Python 3.12, LangGraph |
+| Gesture | MediaPipe Hands (OK / Open Palm / Wave) |
+| Text LLM | GLM-4.6V (Zhipu BigModel, OpenAI-compatible) |
+| Image Gen | Qwen Image 2.0 (DashScope) / Gemini 2.5 Flash (OpenRouter) — provider switchable |
+| Package | `uv` (Python), `npm` (Frontend) |
+| Config | `pydantic-settings` + `.env` |
+| Tracing | LangSmith (optional, 7-day retention) |
 
-**SlangToon** 是一个 AI 驱动的俚语漫画生成器 + **艺术画廊**：用户通过摄像头做 OK 手势触发 → GLM-4.6V 生成随机俚语（**自动去重**）+ 8-12 格漫画脚本 → 用户预览脚本 → 确认后 Qwen Image 2.0 生成漫画条图 → 展示/下载。**空闲 20s 自动进入艺术画廊模式**，Wave 手势唤醒。
-
-### 技术栈
-
-| 层级 | 技术 |
-|------|------|
-| 前端 | React 19, TypeScript 5.7 (strict), Vite 6, Tailwind CSS 4 |
-| 后端 | FastAPI, Python 3.12, LangGraph |
-| 手势检测 | MediaPipe Hands（OK / Open Palm / **Wave**） |
-| 文本大模型 | GLM-4.6V（智谱 BigModel，OpenAI 兼容接口） |
-| 图像生成 | Qwen Image 2.0（通义 DashScope 原生接口） |
-| 包管理 | `uv`（Python）、`npm`（前端） |
-| 配置管理 | `pydantic-settings` + `.env` 文件 |
-
-### 核心工作流
+### Core Workflow
 
 ```
-摄像头 → OK手势触发 → GLM-4.6V 生成俚语+漫画脚本(去重) → 用户预览 → 确认后 Qwen Image 2.0 生图
-     → 展示漫画 → [20s idle] → 艺术画廊(历史轮播) → [Wave] → 回到摄像头
+Camera -> OK gesture -> GLM-4.6V generates slang + script (deduplicated) -> User preview -> Confirmed -> Qwen/Gemini generates image
+     -> Display comic -> [20s idle] -> Art Gallery (history carousel) -> [Wave] -> Back to camera
 ```
 
-### 前端状态机（7 态）
+### Frontend State Machine (7 states)
 
 ```
-                    ┌─ 20s idle ──→ GALLERY
-                    │                   ↑    │
-                    │         [Wave]   │    │ 8s auto-rotate
-                    │                   ↓    │
-  CAMERA_READY ───[OK]──→ SCRIPT_LOADING ──→ SCRIPT_PREVIEW
-       ↑                  │fail                 │                      │ [Generate]
-       │                  ↓                     ↓                      ↓
-       │            CAMERA_READY        COMIC_GENERATING          COMIC_READY
-       │                                                              │
-       └──────────────────────── COMIC_READY ←──────────────────┘
-                          │
+                    +-- 20s idle --> GALLERY
+                    |                   ^    |
+                    |         [Wave]    |    | 8s auto-rotate
+                    |                   v    |
+  CAMERA_READY ---[OK]---> SCRIPT_LOADING ---> SCRIPT_PREVIEW
+       ^                  |fail                 |               | [Generate]
+       |                  v                     v               v
+       |            CAMERA_READY        COMIC_GENERATING    COMIC_READY
+       |                                                        |
+       +------------------------ COMIC_READY <-----------------+
+                          |
                      [New Slang / open_palm]
-                          │
-                          ▼
+                          |
+                          v
                    CAMERA_READY / HISTORY
 ```
 
-**新增状态**: `GALLERY` — 艺术轮播展示模式
+**Gesture Mapping:**
 
-**手势映射**:
-| 手势 | 当前状态 | 目标状态 |
-|------|----------|----------|
+| Gesture | Current State | Target State |
+|---------|---------------|--------------|
 | OK | CAMERA_READY | SCRIPT_LOADING |
-| **Wave** | **GALLERY** | **CAMERA_READY** |
-| Open Palm | 非 COMIC_READY | CAMERA_READY |
+| Wave | GALLERY | CAMERA_READY |
+| Open Palm | any (non-generating) | CAMERA_READY |
 
-**Idle 规则**: `CAMERA_READY` / `COMIC_READY` 状态下 20s 无手势/点击 → `GALLERY`
+**Idle Rule**: `CAMERA_READY` / `COMIC_READY` idle 20s -> `GALLERY`
 
-### 环境要求
+### Requirements
 
-- Python 3.12+
-- Node.js 18+
-- [uv](https://docs.astral.sh/uv/) 包管理器
-- API 密钥：智谱 BigModel（GLM-4.6V）+ 通义 DashScope（Qwen Image 2.0）
+- Python 3.12+, Node.js 18+, [uv](https://docs.astral.sh/uv/)
+- API Keys: Zhipu BigModel (GLM-4.6V) + DashScope (Qwen Image 2.0) or OpenRouter (Gemini 2.5 Flash)
 
 ---
 
-## 代码导航策略
-
-### 优先使用符号级导航
-
-**核心原则：减少全文件读取，使用精确工具定位**
-
-1. **了解模块结构** → `get_symbols_overview` / `find_symbol` 查看符号列表
-2. **查找定义** → `find_symbol`（Serena）或 `Grep`（关键词搜索）
-3. **查找引用** → `find_referencing_symbols` 或 `Grep`
-4. **修改代码** → 定位符号 → `replace_symbol_body` / `insert_after_symbol` / `Edit`
-
-### 读取策略
-
-| 场景 | 推荐方法 |
-|------|----------|
-| 了解模块有哪些类/函数 | `get_symbols_overview` / `find_symbol(depth=1)` |
-| 查找特定符号定义 | `find_symbol(include_body=True)` |
-| 查找函数调用链 | `find_referencing_symbols` |
-| 搜索文本/模式 | `Grep` / `search_for_pattern` |
-| 修改已知位置代码 | `Edit` / `replace_symbol_body` |
-| 新功能开发 | 先读接口文件(schemas/services) → 按需深入 |
-
-### 禁止行为
-
-- ❌ 频繁 `Read` 整个文件"了解结构"——使用 `get_symbols_overview` 替代
-- ❌ 盲目搜索后逐个读取——先缩窄范围
-- ❌ 不了解架构直接猜测位置
-
----
-
-## 项目结构约定
+## Project Structure
 
 ```
 SlangToon/
-├── backend/                  # FastAPI 后端
-│   ├── run.py                # 后端启动入口 (uvicorn)
+├── backend/                      # FastAPI backend
+│   ├── run.py                    # Backend entry (uvicorn, port 8889)
 │   └── app/
-│       ├── main.py           # FastAPI 应用工厂 + lifespan + 中间件
-│       ├── config.py         # Pydantic Settings（从 .env 加载）
-│       ├── dependencies.py   # FastAPI 依赖注入
-│       ├── logging_config.py # 日志配置（文件+控制台）
-│       ├── middleware.py      # 请求 ID 中间件
-│       ├── graphs/           # LangGraph workflow 定义
-│       ├── nodes/            # LangGraph nodes
-│       │   └── script_node.py # 脚本生成节点（集成黑名单+动态 prompt）
-│       ├── routers/          # API 路由层
-│       │   ├── script.py     # POST /api/generate-script — 俚语脚本生成
-│       │   ├── comic.py      # POST /api/generate-comic — 漫画生成
-│       │   ├── history.py    # GET  /api/history — 历史记录
-│       │   └── traces.py     # GET  /api/traces — 请求追踪
-│       ├── schemas/          # Pydantic 请求/响应模型
-│       │   ├── common.py     # ApiResponse 统一信封 + ErrorCode
-│       │   ├── script.py     # ScriptRequest / ScriptResponse / ScriptData / Panel
-│       │   ├── comic.py      # ComicRequest / ComicResponse
-│       │   └── history.py    # HistoryItem / HistoryResponse
-│       ├── services/         # 业务逻辑层
-│       │   ├── llm_client.py       # GLM-4.6V LLM 客户端（text + vision）
-│       │   ├── image_gen_client.py # Qwen Image 2.0 图像生成客户端（text-to-image）
-│       │   ├── script_service.py   # 生成随机俚语 + 漫画脚本
-│       │   ├── comic_service.py    # 构建漫画 prompt + Qwen 生图 + 保存
-│       │   └── history_service.py  # 历史记录管理
-│       ├── storage/          # 持久化
-│       │   └── file_storage.py     # 基于文件的漫画图片存储
-│       ├── prompts/          # Prompt 模板
-│       │   ├── script_prompt.py    # 俚语脚本提示词 + build_system_prompt()
-│       │   └── comic_prompt.py     # 漫画视觉构图提示词
-│       └── slang_blacklist.py  # 俚语去重黑名单管理（JSON 持久化）
-├── frontend/                 # React 19 + TypeScript + Vite
-│   ├── vite.config.ts        # Vite 配置 + API 代理
-│   ├── tsconfig.app.json     # TypeScript 严格模式
+│       ├── main.py               # App factory + lifespan + CORS + static mount
+│       ├── config.py             # Pydantic Settings (from ../.env)
+│       ├── dependencies.py       # FastAPI DI
+│       ├── logging_config.py     # Logging (file + console + request_id)
+│       ├── middleware.py         # RequestIdMiddleware
+│       ├── slang_blacklist.py    # Slang dedup blacklist (JSON, max 50)
+│       ├── routers/
+│       │   ├── script.py         # POST /api/generate-script
+│       │   ├── comic.py          # POST /api/generate-comic
+│       │   ├── history.py        # GET  /api/history
+│       │   └── traces.py         # GET  /api/traces
+│       ├── schemas/
+│       │   ├── common.py         # ApiResponse envelope + ErrorCode
+│       │   ├── script.py         # ScriptData / Panel (panel_count: 3-6)
+│       │   ├── comic.py          # ComicRequest / ComicResponse
+│       │   └── history.py        # HistoryItem / HistoryResponse
+│       ├── services/
+│       │   ├── llm_client.py           # GLM-4.6V (OpenAI-compatible, retry + backoff)
+│       │   ├── image_gen_client.py     # Backward-compatible wrapper -> provider
+│       │   ├── image_gen/              # Provider abstraction layer
+│       │   │   ├── base.py             # BaseImageGenProvider (abstract)
+│       │   │   ├── dashscope_provider.py   # Qwen Image 2.0
+│       │   │   ├── openrouter_provider.py  # Gemini 2.5 Flash
+│       │   │   └── factory.py          # create_image_gen_client()
+│       │   ├── history_service.py      # History CRUD (JSON file)
+│       │   └── comic_service.py        # (legacy, now handled by graph)
+│       ├── graphs/                     # LangGraph workflows
+│       │   ├── state.py                # WorkflowState (TypedDict)
+│       │   ├── script_graph.py         # START -> script_node -> END
+│       │   ├── comic_graph.py          # START -> prompt -> [condense] -> comic -> save -> END
+│       │   ├── trace_models.py         # Trace data models
+│       │   ├── trace_store.py          # Trace file storage + retention
+│       │   └── trace_collector.py      # Trace invocation wrapper
+│       ├── nodes/                      # LangGraph nodes
+│       │   ├── script_node.py          # Generate slang + script (blacklist integrated)
+│       │   ├── prompt_node.py          # Build visual prompt from panels
+│       │   ├── condense_node.py        # Truncate prompt if > 950 tokens
+│       │   ├── comic_node.py           # Image gen (2688x1536, 16:9)
+│       │   └── save_node.py            # Save image + history record
+│       └── prompts/
+│           ├── script_prompt.py        # Slang + script system prompt (blacklist)
+│           ├── comic_prompt.py         # Visual composition prompt + token counting
+│           └── condense_prompt.py      # Prompt condensation
+├── frontend/                     # React 19 + TypeScript + Vite
+│   ├── vite.config.ts            # Vite config + API proxy -> localhost:8889
+│   ├── tsconfig.app.json         # strict: true
 │   └── src/
-│       ├── main.tsx          # 应用入口
-│       ├── App.tsx           # 根组件 + 7 状态状态机 + Idle Timer + Gallery
-│       ├── components/       # UI 组件（每个组件一个目录）
-│       │   ├── CameraView/       # 摄像头视图
-│       │   ├── ScriptPreview/    # 脚本预览（俚语+分镜）
-│       │   ├── ComicDisplay/     # 漫画展示 + 下载
-│       │   ├── HistoryList/      # 历史记录列表
-│       │   ├── GalleryView/      # 艺术画廊轮播组件 (NEW)
-│       │   ├── ErrorDisplay.tsx  # 错误展示
-│       │   └── LoadingOrb.tsx    # 加载动画
-│       ├── hooks/            # React Hooks
-│       │   ├── useCamera.ts          # 摄像头管理
-│       │   ├── useGestureDetector.ts # OK / Palm / Wave 检测
-│       │   └── useMediaPipeHands.ts  # MediaPipe Hands 初始化
-│       ├── services/         # API 客户端
-│       │   └── api.ts             # fetch 封装 + 端点函数
-│       ├── types/            # TypeScript 类型定义
-│       │   ├── index.ts          # AppState (7 states) + GestureType (+wave)
-│       │   └── __tests__/       # 类型单元测试
-│       ├── constants/        # 常量配置
-│       │   └── index.ts          # API_BASE_URL / ENDPOINTS / TIMEOUTS
-│       └── utils/            # 工具函数
-│           └── gestureAlgo.ts   # detectGesture + WaveBuffer + detectWave
-├── tests/                    # 统一测试目录
+│       ├── main.tsx
+│       ├── App.tsx               # Root: 7-state machine + idle timer + gallery
+│       ├── components/
+│       │   ├── CameraView/           # Camera feed + gesture overlay
+│       │   ├── ScriptPreview/        # Slang + panel preview
+│       │   ├── ComicDisplay/         # Fullscreen immersive comic + auto-fading labels
+│       │   ├── GalleryView/          # Fullscreen museum-style crossfade carousel
+│       │   ├── HistoryList/          # History list
+│       │   ├── GlowBackground/      # Animated glow background
+│       │   ├── GestureProgressRing/  # Gesture hold progress indicator
+│       │   ├── GestureHint/          # Gesture instruction overlay
+│       │   ├── GlassButton.tsx       # Glass-morphism button
+│       │   ├── PageTransition.tsx    # Page transition animation
+│       │   ├── LoadingOrb.tsx        # Loading animation
+│       │   └── ErrorDisplay.tsx      # Error display
+│       ├── hooks/
+│       │   ├── useCamera.ts              # Camera stream management
+│       │   ├── useMediaPipeHands.ts      # MediaPipe Hands init
+│       │   ├── useGestureDetector.ts     # Frame-level gesture recognition
+│       │   └── useGestureConfirm.ts      # Gesture hold/confirmation logic
+│       ├── services/
+│       │   └── api.ts                # Fetch wrapper + endpoint functions
+│       ├── types/
+│       │   └── index.ts              # AppState (7), GestureType (ok|open_palm|wave|none)
+│       ├── constants/
+│       │   └── index.ts              # API_BASE_URL / ENDPOINTS / TIMEOUTS
+│       └── utils/
+│           └── gestureAlgo.ts        # detectGesture + WaveBuffer + detectWave
+├── tests/
 │   ├── backend/
-│   │   ├── conftest.py       # 共享 fixtures（client, mock 数据等）
-│   │   └── unit/             # 单元测试（Mock 外部依赖）
-│   │       ├── test_app.py
-│   │       ├── test_config.py
-│   │       ├── test_slang_blacklist.py  # 黑名单模块测试 (NEW)
-│   │       ├── test_prompts.py
-│   │       ├── test_script_node.py      # 节点集成测试
-│   │       └── ...                       # 其他 service/route/schema 测试
+│   │   ├── conftest.py               # Shared fixtures
+│   │   ├── unit/                     # 29 test files (all services/nodes/graphs/routes)
+│   │   └── integration/              # Real API + LangSmith + trace tests
 │   ├── frontend/
-│   │   ├── unit/             # Vitest 单元测试
-│   │   └── e2e/              # Playwright E2E 测试
-│   └── e2e/                  # 全栈端到端测试
-├── docs/                     # 设计文档
-├── .env.example              # 环境变量模板
-├── pyproject.toml            # Python 项目配置（uv + pytest）
-└── start.py                  # 一键启动脚本（前后端同时启动）
+│   │   ├── unit/                     # Vitest (smoke.test.ts)
+│   │   └── e2e/                      # Playwright (core-flow.spec.ts)
+│   └── e2e/                          # Full-stack E2E (e2e_test.py)
+├── pyproject.toml                # Python deps (FastAPI, LangGraph, LangSmith, etc.)
+├── start.py                      # Unified launcher (backend:8889 + frontend:5174)
+└── .env.example                  # API keys + provider config template
 ```
 
-### 后端模块依赖关系
+### Backend Module Dependencies
 
 ```
-              ┌──────────┐
-              │ routers/ │   HTTP 接口层，依赖注入 Settings
-              └────┬─────┘
-                   │
-              ┌────▼─────┐
-              │ services/│   业务编排（script → comic → history）
-              └────┬─────┘
-                   │
-    ┌──────┬───────┼────────┬──────────┐
-    │      │       │        │          │
-┌───▼──┐ ┌▼──────┐ │   ┌───▼────┐ ┌───▼──────┐
-│prompts│ │llm_   │ │   │image_  │ │ storage/ │
-│script│ │client │ │   │gen_    │ │history_  │
-│comic │ │       │ │   │client  │ │service   │
-└──────┘ └───┬───┘ │   └────────┘ └──────────┘
-│           │     │
-│     ┌─────▼─────┐ │
-│     │ slang_      │ │
-│     │ blacklist   │ │
-│     └────────────┘ │
-│                   │
-│           ┌───────▼─────┐
-│           │ schemas/     │   Pydantic 模型，纯数据结构
-│           │ config       │   Settings 配置
-│           └─────────────┘
+routers/  -->  services/  -->  (llm_client | image_gen/ | prompts/ | slang_blacklist | storage/)  -->  schemas/ + config
+              graphs/    -->  nodes/  -->  (services | prompts | slang_blacklist)
 ```
 
-**依赖方向**: `routers → services → (llm_client | image_gen_client | prompts | slang_blacklist | storage) → schemas/config`
-
-**两阶段 LLM 调用流程**: `script_node` 使用 `build_system_prompt(blacklist)` 动态构建含去重约束的 system prompt → `LLMClient.chat()` → 成功后 `blacklist.add(slang)` 写入黑名单。`comic_service` 使用 `build_comic_prompt` 将脚本转为视觉构图 prompt，再调 `ImageGenClient.generate_from_text()` 生图。
+**Two LangGraph Pipelines:**
+1. **ScriptGraph**: `START -> script_node -> END` — generates slang + 3-6 panel script
+2. **ComicGraph**: `START -> prompt_node -> [condense_node if >950 tokens] -> comic_node -> save_node -> END` — builds visual prompt, generates 16:9 image, saves
 
 ---
 
-## API 规范
+## API Spec
 
-### 统一响应信封
-
-所有 API 返回 `ApiResponse` 信封格式：
+### Envelope
 
 ```json
-{
-  "code": 0,
-  "message": "success",
-  "data": { ... }
-}
+{ "code": 0, "message": "success", "data": { ... } }
 ```
 
-错误时 `code` 为非零值，`data` 为 `null`。
+### Endpoints
 
-### 端点定义
-
-| 端点 | 方法 | 请求体 | 响应 data |
-|------|------|--------|-----------|
-| `/api/generate-script` | POST | `{}` (空对象，预留扩展) | `{ slang, origin, explanation, panel_count, panels: Panel[] }` |
-| `/api/generate-comic` | POST | `{ slang, origin, explanation, panel_count, panels: Panel[] }` | `{ comic_url, thumbnail_url, history_id }` |
-| `/api/history` | GET | Query: `page`, `page_size` | `{ items: HistoryItem[], total, page, page_size, total_pages }` |
-| `/api/traces` | GET | Query: `days`, `limit` | 请求追踪记录列表 |
+| Endpoint | Method | Request | Response data |
+|----------|--------|---------|---------------|
+| `/api/generate-script` | POST | `{}` | `{ slang, origin, explanation, panel_count, panels: Panel[] }` |
+| `/api/generate-comic` | POST | `{ slang, origin, explanation, panel_count, panels }` | `{ comic_url, thumbnail_url, history_id }` |
+| `/api/history` | GET | `?page&page_size` | `{ items, total, page, page_size, total_pages }` |
+| `/api/traces` | GET | `?days&limit` | Trace records |
 | `/health` | GET | - | `{ status, app }` |
 
-### 关键约定
+### Conventions
 
-- **字段命名**: 后端全部使用 `snake_case`（`panel_count`、`comic_url`、`page_size`）
-- **前端代理**: Vite 开发服务器代理 `/api` 和 `/data` 到 `http://localhost:8888`
-- **漫画存储**: 本地文件系统 `data/comics/YYYY-MM-DD/{uuid}.png`
-- **黑名单存储**: 本地 JSON 文件 `data/slang_blacklist.json`（最多 50 条）
+- **Field naming**: `snake_case` everywhere (`panel_count`, `comic_url`, `page_size`)
+- **panel_count**: 3-6 (for 2x2/2x3 grid layouts)
+- **Vite proxy**: `/api` and `/data` -> `http://localhost:8889`
+- **Comic storage**: `data/comics/YYYY-MM-DD/{uuid}.png`
+- **Blacklist storage**: `data/slang_blacklist.json` (max 50)
+- **Image size**: 2688x1536 (16:9 landscape)
 
-### 错误码体系
+### Error Codes
 
 ```python
 class ErrorCode:
-    BAD_REQUEST = 40001          # 通用请求错误
-    SCRIPT_LLM_FAILED = 50001    # 脚本生成 LLM 调用失败
-    SCRIPT_LLM_INVALID = 50002   # 脚本响应 JSON 解析失败
-    COMIC_LLM_FAILED = 50003     # 漫画 prompt 构图失败
-    COMIC_LLM_INVALID = 50004    # 漫画 prompt 响应解析失败
-    IMAGE_GEN_FAILED = 50005     # Qwen 生图失败
-    IMAGE_DOWNLOAD_FAILED = 50006 # 图片下载失败
-    INTERNAL_ERROR = 50007       # 内部错误
+    BAD_REQUEST = 40001
+    SCRIPT_LLM_FAILED = 50001
+    SCRIPT_LLM_INVALID = 50002
+    COMIC_LLM_FAILED = 50003
+    COMIC_LLM_INVALID = 50004
+    IMAGE_GEN_FAILED = 50005
+    IMAGE_DOWNLOAD_FAILED = 50006
+    INTERNAL_ERROR = 50007
 ```
 
 ---
 
-## 测试规范
+## Testing
 
-### 三层测试架构
+### Structure
 
 ```
-tests/
-├── backend/
-│   ├── unit/            # 单元测试：隔离、快速、Mock 外部依赖
-│   │   ├── test_app.py
-│   │   ├── test_comic_route.py
-│   │   ├── test_comic_service.py
-│   │   ├── test_config.py
-│   │   ├── test_dependencies.py
-│   │   ├── test_file_storage.py
-│   │   ├── test_flow_trace.py
-│   │   ├── test_history.py
-│   │   ├── test_history_service.py
-│   │   ├── test_image_gen_client.py
-│   │   ├── test_llm_client.py
-│   │   ├── test_logging_config.py
-│   │   ├── test_middleware.py
-│   │   ├── test_prompts.py
-│   │   ├── test_schemas.py
-│   │   ├── test_script_route.py
-│   │   ├── test_script_service.py
-│   │   └── test_slang_blacklist.py  # 黑名单模块测试 (NEW)
-│   └── integration/     # 集成测试：真实 API 调用
-│       └── test_real_api.py
-├── frontend/
-│   ├── unit/            # Vitest 单元测试
-│   └── e2e/             # Playwright E2E 测试
-└── e2e/                 # 全栈端到端测试
-    └── e2e_test.py
+tests/backend/unit/       # 29 files — all modules covered
+tests/backend/integration/ # Real API, LangSmith, trace v2
+tests/frontend/unit/      # Vitest smoke tests
+tests/frontend/e2e/       # Playwright core-flow
+tests/e2e/                # Full-stack E2E
 ```
 
-### 共享 Fixtures（tests/backend/conftest.py）
+### Shared Fixtures (conftest.py)
 
-- `tmp_data_dir` — 创建临时 data 目录结构 + 设置环境变量
-- `client` — FastAPI ASGI 测试客户端（httpx AsyncClient）
-- `mock_script_data` — 模拟脚本 LLM 返回的俚语脚本数据（slang, origin, explanation, panels）
-- `mock_comic_prompt` — 模拟漫画 prompt 构建函数返回的视觉构图 prompt
-- `mock_image_gen_b64` — 模拟生成的蓝色 64x64 PNG
+- `tmp_data_dir` — temp data dir + env vars
+- `client` — httpx AsyncClient (ASGI)
+- `mock_script_data` — mock LLM script response
+- `mock_comic_prompt` — mock visual prompt
+- `mock_image_gen_b64` — mock 64x64 PNG
 
-### 测试命名约定
+### Naming Convention
 
 ```python
-# 格式: test_<被测方法>_<场景>_<预期结果>
-def test_generate_script_valid_response_returns_data(): ...
-def test_generate_comic_image_gen_timeout_returns_error(): ...
-
-# 参数化测试
-@pytest.mark.parametrize("panel_count", [8, 9, 10, 11, 12])
-def test_script_accepts_valid_panel_counts(panel_count): ...
-```
-
-### pytest 配置
-
-```toml
-# pyproject.toml
-[tool.pytest.ini_options]
-testpaths = ["tests/backend"]
-```
-
-conftest.py 自动将 `backend/` 加入 `sys.path`，支持 `from app.*` 导入。
-
----
-
-## 代码质量标准
-
-### Python 后端
-
-- **框架**: FastAPI + Pydantic v2
-- **HTTP 客户端**: `httpx`（async），已配置重试 + 指数退避
-- **配置**: `pydantic-settings`，从 `../.env`（项目根目录）加载
-- **日志**: `logging` 模块，按模块获取 logger
-- **类型注解**: 推荐完整类型注解（Python 3.12 风格）
-- **异常体系**: 每个客户端定义专属异常（`LLMTimeoutError`、`LLMApiError`、`ImageGenApiError`、`ImageGenTimeoutError` 等）
-
-```python
-# 良好的示例 — 后端服务函数（脚本生成，集成黑名单）
-async def script_node(state: WorkflowState, config: RunnableConfig) -> dict:
-    """生成随机俚语 + 8-12 格漫画脚本（带去重）。"""
-    settings = config["configurable"]["settings"]
-    blacklist = SlangBlacklist(file_path=settings.slang_blacklist_file)
-    recent_slangs = blacklist.get_recent(50)
-    system_prompt = build_system_prompt(recent_slangs)
-    llm = LLMClient(settings)
-    response = await llm.chat(system_prompt=system_prompt, user_text=..., temperature=0.9)
-    data = LLMClient.extract_json_from_content(response.content)
-    # ...校验 panel_count 和 panels...
-    slang = data["slang"]
-    blacklist.add(slang)  # 仅成功时写入
-    return { "slang": slang, ... }
-```
-
-### TypeScript 前端
-
-- **框架**: React 19（函数组件 + Hooks）
-- **构建**: Vite 6 + `@vitejs/plugin-react`
-- **样式**: Tailwind CSS 4（`@tailwindcss/vite` 插件）
-- **类型**: `tsconfig.app.json` 启用 `strict: true`
-- **组件结构**: 每个组件一个目录，包含 `.tsx` + `.test.tsx`
-- **状态管理**: App 级状态机（`AppState` 枚举，7 个状态），不使用全局状态库
-
-```typescript
-// 良好的示例 — React 组件（GalleryView）
-interface GalleryViewProps {
-  items: HistoryItem[];
-  intervalMs?: number;
-}
-
-export default function GalleryView({ items, intervalMs = 8000 }: GalleryViewProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  // ...轮播逻辑 + fade transition
-}
-```
-
-### SOLID / KISS / DRY / YAGNI 原则
-
-- **S（单一职责）**: 路由层(routers)仅处理 HTTP，业务逻辑在 services/nodes，数据模型在 schemas
-- **O（开闭原则）**: 通过 Pydantic 模型扩展请求/响应，不修改路由签名
-- **D（依赖倒置）: 路由依赖 Settings 抽象注入，服务函数接受 Settings 参数
-- **KISS**: 避免过度抽象——当前业务简单，不需要 Repository/UnitOfWork 模式
-- **DRY**: 共享 fixtures 在 conftest.py，共享类型在 `types/index.ts`，共享常量在 `constants/index.ts`
-- **YAGNI**: 仅实现当前需要的功能，不预留未来扩展点
-
-### 代码格式
-
-```python
-# 导入顺序：标准库 → 第三方 → 本地
-import json
-import logging
-
-import httpx
-from pydantic import BaseModel, Field
-
-from app.config import Settings
-from app.schemas.common import ApiResponse
-
-# 函数长度：≤ 50 行（复杂逻辑抽取子函数）
-# 类长度：≤ 300 行（考虑拆分）
+def test_<method>_<scenario>_<expected>(): ...
 ```
 
 ---
 
-## 快速命令参考
+## Code Standards
+
+### Python Backend
+
+- FastAPI + Pydantic v2, `httpx` async with retry + backoff
+- `pydantic-settings` from `../.env`, `logging.getLogger(__name__)`
+- Custom exceptions per client: `LLMTimeoutError`, `LLMApiError`, `ImageGenApiError`, `ImageGenTimeoutError`
+- Image gen provider abstraction: `BaseImageGenProvider` -> DashScope / OpenRouter (factory pattern)
+- Type annotations: Python 3.12 style
+
+### TypeScript Frontend
+
+- React 19 function components + Hooks, Vite 6, Tailwind CSS 4
+- `tsconfig.app.json` strict: true
+- Component structure: one directory per component (`.tsx` + `.test.tsx`)
+- App-level state machine (7 states), no global state library
+- Gesture confirmation via `useGestureConfirm` hook (hold-to-activate pattern)
+
+### Principles
+
+- **S**: Routers = HTTP only, business logic in services/nodes, data in schemas
+- **O**: Extend via Pydantic models, image gen via provider abstraction
+- **D**: Settings injected, image gen via factory
+- **KISS**: No over-abstraction for current scale
+- **DRY**: Shared fixtures in conftest, shared types in `types/index.ts`
+- **YAGNI**: Only implement what's needed now
+
+---
+
+## Quick Commands
 
 ```bash
-# 一键启动（前后端）
+# Start all (backend + frontend)
 python start.py
 
-# 单独启动后端
+# Backend only (port 8889)
 uv run python backend/run.py
 
-# 单独启动前端
+# Frontend only (port 5174)
 cd frontend && npm run dev
 
-# 后端单元测试
+# Backend unit tests
 uv run pytest tests/backend/unit/ -v
 
-# 后端集成测试（需 API Key）
+# Backend integration tests (needs API keys)
 uv run pytest tests/backend/integration/test_real_api.py -v -s
 
-# 前端单元测试
+# Frontend unit tests
 cd frontend && npx vitest run
 
-# 前端类型检查
+# Frontend type check
 cd frontend && npx tsc --noEmit
 
-# 前端构建
+# Frontend build
 cd frontend && npm run build
 
-# 前端 E2E 测试
+# Frontend E2E
 cd frontend && npx playwright test
 
-# 全栈 E2E 测试
+# Full-stack E2E
 uv run python tests/e2e/e2e_test.py
 ```
 
 ---
 
-## 检查清单
+## Pre-commit Checklist
 
-### 提交前必检
-
-- [ ] `uv run pytest tests/backend/unit/ -v` 全部通过
-- [ ] `cd frontend && npx vitest run` 全部通过
-- [ ] `cd frontend && npx tsc --noEmit` 零错误
-- [ ] 新/修改的后端代码有对应测试
-- [ ] API 字段使用 `snake_case`（`panel_count`、`comic_url`、`page_size`）
-- [ ] 前后端类型定义与 schemas 保持同步
-- [ ] 遵循 SOLID / KISS / DRY / YAGNI
-- [ ] 无重复代码
-- [ ] 函数/类有文档字符串或 JSDoc
-
-### Code Review 标准
-
-- [ ] Pydantic 模型字段有 `description` 和合适的验证（`min_length`、`ge`、`le` 等）
-- [ ] 异常处理使用自定义异常类，不裸 `raise Exception`
-- [ ] HTTP 客户端使用 `httpx`，不使用 `requests`
-- [ ] React 组件使用函数式写法 + TypeScript 接口定义 Props
-- [ ] 日志使用 `logging.getLogger(__name__)`，不使用 `print()`
-- [ ] 依赖方向正确：`routers → services/nodes → clients/storage/prompts/blacklist → schemas/config`
+- [ ] `uv run pytest tests/backend/unit/ -v` passes
+- [ ] `cd frontend && npx vitest run` passes
+- [ ] `cd frontend && npx tsc --noEmit` zero errors
+- [ ] New/modified backend code has tests
+- [ ] API fields use `snake_case`
+- [ ] Frontend/backend types in sync
+- [ ] SOLID / KISS / DRY / YAGNI
+- [ ] No duplicate code
+- [ ] Dependency direction: `routers -> services/nodes -> clients/prompts/storage -> schemas/config`

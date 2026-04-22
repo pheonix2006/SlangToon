@@ -180,13 +180,62 @@ class TestGenerateFromText:
 
 
 # ---------------------------------------------------------------------------
-# generate (image-to-image) — not supported
+# generate (image-to-image)
 # ---------------------------------------------------------------------------
 
 class TestGenerate:
 
     @pytest.mark.asyncio
-    async def test_raises_not_supported(self) -> None:
+    async def test_success(self) -> None:
         p = _make_provider()
-        with pytest.raises(ImageGenApiError, match="not support"):
-            await p.generate("prompt", "base64data", ImageSize(1024, 1024))
+
+        async def mock_post(self_client, url, json=None, headers=None):
+            return _fake_openrouter_response("dGVzdA==")
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            result = await p.generate(
+                "edit this image", "data:image/jpeg;base64,abc123", ImageSize(2688, 1536)
+            )
+
+        assert result == "data:image/png;base64,dGVzdA=="
+
+    @pytest.mark.asyncio
+    async def test_payload_structure(self) -> None:
+        p = _make_provider()
+        captured: dict = {}
+
+        async def mock_post(self_client, url, json=None, headers=None):
+            captured["json"] = json
+            return _fake_openrouter_response()
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            await p.generate(
+                "edit this", "data:image/jpeg;base64,abc123", ImageSize(2688, 1536)
+            )
+
+        payload = captured["json"]
+        content = payload["messages"][0]["content"]
+        assert isinstance(content, list)
+        assert content[0]["type"] == "image_url"
+        assert content[0]["image_url"]["url"] == "data:image/jpeg;base64,abc123"
+        assert content[1]["type"] == "text"
+        assert content[1]["text"] == "edit this"
+        assert payload["modalities"] == ["image", "text"]
+
+    @pytest.mark.asyncio
+    async def test_ensure_data_url_prefix(self) -> None:
+        p = _make_provider()
+        captured: dict = {}
+
+        async def mock_post(self_client, url, json=None, headers=None):
+            captured["json"] = json
+            return _fake_openrouter_response()
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "post", mock_post)
+            await p.generate("edit", "raw_base64_no_prefix", ImageSize(1024, 1024))
+
+        content = captured["json"]["messages"][0]["content"]
+        assert content[0]["image_url"]["url"] == "data:image/jpeg;base64,raw_base64_no_prefix"
