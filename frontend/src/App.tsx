@@ -9,7 +9,7 @@ import { generateScript, generateComic, getHistory, fetchConfig } from './servic
 import GlowBackground from './components/GlowBackground/GlowBackground';
 import PageTransition from './components/PageTransition';
 import CameraView from './components/CameraView/CameraView';
-import ScriptPreview from './components/ScriptPreview/ScriptPreview';
+import { CountdownCapture } from './components/CountdownCapture';
 import ComicDisplay from './components/ComicDisplay/ComicDisplay';
 import HistoryList from './components/HistoryList/HistoryList';
 import GalleryView from './components/GalleryView/GalleryView';
@@ -26,6 +26,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [galleryItems, setGalleryItems] = useState<HistoryItem[]>([]);
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
 
   const appStateRef = useRef<AppState>(appState);
   const setAppStateSync = useCallback((newState: AppState) => {
@@ -42,6 +43,7 @@ function App() {
   const goHome = useCallback(() => {
     setScriptData(null);
     setComicUrl('');
+    setReferenceImage(null);
     setError(null);
     setAppStateSync(AppState.CAMERA_READY);
   }, [setAppStateSync]);
@@ -50,7 +52,7 @@ function App() {
   // ── Idle Timer ──
   const IDLE_TIMEOUT_MS = 20_000;
   const IDLE_STATES = new Set([AppState.CAMERA_READY, AppState.COMIC_READY]);
-  const GLOW_STATES = new Set([AppState.SCRIPT_LOADING, AppState.COMIC_GENERATING]);
+  const GLOW_STATES = new Set([AppState.GENERATING]);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startIdleTimer = useCallback(() => {
@@ -69,16 +71,27 @@ function App() {
   // ── Camera ──
   const { videoRef, isReady, error: cameraError, restart: restartCamera } = useCamera();
 
-  // ── Script generation ──
-  const handleGenerateScript = useCallback(async () => {
+  // ── Unified generation: script → comic (串行) ──
+  const handleGenerate = useCallback(async (capturedImage: string) => {
+    setReferenceImage(capturedImage);
     setError(null);
-    setAppStateSync(AppState.SCRIPT_LOADING);
+    setAppStateSync(AppState.GENERATING);
     try {
-      const response = await generateScript();
-      setScriptData(response.data);
-      setAppStateSync(AppState.SCRIPT_PREVIEW);
+      const scriptResponse = await generateScript();
+      setScriptData(scriptResponse.data);
+
+      const comicResponse = await generateComic({
+        slang: scriptResponse.data.slang,
+        origin: scriptResponse.data.origin,
+        explanation: scriptResponse.data.explanation,
+        panel_count: scriptResponse.data.panel_count,
+        panels: scriptResponse.data.panels,
+        reference_image: capturedImage,
+      });
+      setComicUrl(comicResponse.data.comic_url);
+      setAppStateSync(AppState.COMIC_READY);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to generate script';
+      const msg = err instanceof Error ? err.message : 'Failed to generate';
       setError(msg);
       setAppStateSync(AppState.CAMERA_READY);
     }
@@ -107,38 +120,14 @@ function App() {
     onResults: handleMediaPipeResults,
   });
 
-  // ── Comic generation ──
-  const handleGenerateComic = useCallback(async () => {
-    if (!scriptData) return;
-    setError(null);
-    setAppStateSync(AppState.COMIC_GENERATING);
-    try {
-      const response = await generateComic({
-        slang: scriptData.slang,
-        origin: scriptData.origin,
-        explanation: scriptData.explanation,
-        panel_count: scriptData.panel_count,
-        panels: scriptData.panels,
-      });
-      setComicUrl(response.data.comic_url);
-      setAppStateSync(AppState.COMIC_READY);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to generate comic';
-      setError(msg);
-      setAppStateSync(AppState.SCRIPT_PREVIEW);
-    }
-  }, [scriptData, setAppStateSync]);
-
   // ── Gesture confirm layer ──
   const handleGestureAction = useCallback((action: string) => {
     switch (action) {
-      case 'generateScript': handleGenerateScript(); break;
-      case 'generateComic': handleGenerateComic(); break;
-      case 'reshuffleScript': handleGenerateScript(); break;
+      case 'startCountdown': setAppStateSync(AppState.COUNTDOWN); break;
       case 'startNew': goHome(); break;
       case 'wakeUp': setAppStateSync(AppState.CAMERA_READY); break;
     }
-  }, [handleGenerateScript, handleGenerateComic, goHome, setAppStateSync]);
+  }, [goHome, setAppStateSync]);
 
   const { activeGesture, progress, label, feedGesture } = useGestureConfirm({
     appState,
@@ -184,7 +173,9 @@ function App() {
   // ── Render ──
   // Camera must stay mounted (not just alive in GALLERY) — CSS-hidden when unused
   // so the <video> element is never unmounted, preserving the stream + MediaPipe loop
-  const showCamera = appState === AppState.CAMERA_READY || appState === AppState.GALLERY;
+  const showCamera = appState === AppState.CAMERA_READY
+      || appState === AppState.COUNTDOWN
+      || appState === AppState.GALLERY;
   const isHistory = appState === AppState.HISTORY;
 
   return (
@@ -221,36 +212,31 @@ function App() {
           </div>
         </div>
 
-        {/* SCRIPT_LOADING / COMIC_GENERATING */}
-        {(appState === AppState.SCRIPT_LOADING || appState === AppState.COMIC_GENERATING) && (
+        {/* COUNTDOWN */}
+        {appState === AppState.COUNTDOWN && (
+          <CountdownCapture
+            videoRef={videoRef}
+            onCapture={handleGenerate}
+          />
+        )}
+
+        {/* GENERATING */}
+        {appState === AppState.GENERATING && (
           <PageTransition>
             <div className="flex flex-col items-center justify-center py-16 gap-4">
               {error ? (
                 <ErrorDisplay
                   message={error}
-                  onRetry={appState === AppState.SCRIPT_LOADING ? goHome : handleGenerateComic}
-                  retryText="Retry"
+                  onRetry={goHome}
+                  retryText="Try Again"
                 />
               ) : (
                 <LoadingOrb
-                  label={appState === AppState.SCRIPT_LOADING ? 'CREATING' : 'DRAWING'}
-                  subtext={
-                    appState === AppState.SCRIPT_LOADING
-                      ? '寻找一个有趣的俚语...'
-                      : '绘制你的漫画...'
-                  }
+                  label="CREATING"
+                  subtext="正在为你创作漫画..."
                 />
               )}
             </div>
-          </PageTransition>
-        )}
-
-        {/* SCRIPT_PREVIEW */}
-        {appState === AppState.SCRIPT_PREVIEW && scriptData && (
-          <PageTransition>
-            <ScriptPreview
-              data={scriptData}
-            />
           </PageTransition>
         )}
 
