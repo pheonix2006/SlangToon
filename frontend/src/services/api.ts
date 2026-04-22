@@ -1,4 +1,4 @@
-import type { ScriptResponse, ComicResponse, HistoryResponse } from '../types';
+import type { ScriptResponse, ScriptData, ComicResponse, HistoryResponse } from '../types';
 import { API_BASE_URL, API_ENDPOINTS, TIMEOUTS } from '../constants';
 
 // ---------------------------------------------------------------------------
@@ -176,4 +176,64 @@ export async function getHistory(
     },
     TIMEOUTS.HISTORY_REQUEST,
   );
+}
+
+export async function generateScriptStream(
+  onThinking: (text: string) => void,
+  onScript: (data: ScriptData) => void,
+  onError: (msg: string) => void,
+): Promise<void> {
+  const url = `${API_BASE_URL}${API_ENDPOINTS.GENERATE_SCRIPT_STREAM}`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+    signal: AbortSignal.timeout(dynamicTimeouts.script),
+  });
+
+  if (!resp.ok) {
+    onError(`HTTP ${resp.status}`);
+    return;
+  }
+
+  const reader = resp.body?.getReader();
+  if (!reader) {
+    onError('No response body');
+    return;
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    let currentEvent = '';
+    for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        currentEvent = line.slice(7);
+      } else if (line.startsWith('data: ') && currentEvent) {
+        const data = JSON.parse(line.slice(6));
+        switch (currentEvent) {
+          case 'thinking':
+            onThinking(data.text);
+            break;
+          case 'script':
+            onScript(data as ScriptData);
+            break;
+          case 'error':
+            onError(data.message || 'Generation failed');
+            break;
+          case 'done':
+            break;
+        }
+        currentEvent = '';
+      }
+    }
+  }
 }

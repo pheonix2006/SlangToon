@@ -2,6 +2,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export const API_ENDPOINTS = {
   GENERATE_SCRIPT: '/api/generate-script',
+  GENERATE_SCRIPT_STREAM: '/api/generate-script-stream',
   GENERATE_COMIC: '/api/generate-comic',
   HISTORY: '/api/history',
 } as const;
