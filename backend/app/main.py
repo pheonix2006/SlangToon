@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import Settings, get_settings
 from app.logging_config import setup_logging
 from app.middleware import RequestIdMiddleware
-from app.routers import script, comic, history, traces
+from app.routers import script, script_stream, comic, history, traces
 
 
 @asynccontextmanager
@@ -45,6 +45,7 @@ def create_app() -> FastAPI:
     if data_dir.exists():
         app.mount("/data", StaticFiles(directory="data"), name="data")
     app.include_router(script.router)
+    app.include_router(script_stream.router)
     app.include_router(comic.router)
     app.include_router(history.router)
     app.include_router(traces.router)
