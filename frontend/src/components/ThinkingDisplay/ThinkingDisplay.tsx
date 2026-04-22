@@ -24,7 +24,7 @@ export default function ThinkingDisplay({ text, isActive }: ThinkingDisplayProps
     >
       <div
         ref={containerRef}
-        className="max-h-[40vh] overflow-y-auto px-6 py-4 rounded-xl text-base font-mono leading-relaxed"
+        className="max-h-[55vh] overflow-y-auto px-6 py-4 rounded-xl text-base font-mono leading-relaxed"
         style={{
           color: 'rgba(255,255,255,0.4)',
           backgroundColor: 'rgba(255,255,255,0.03)',
