@@ -4,6 +4,7 @@ from langchain_core.runnables import RunnableConfig
 from app.graphs.state import WorkflowState
 from app.prompts.script_prompt import build_system_prompt
 from app.services.llm_client import LLMClient
+from app.services.script_service import validate_and_finalize
 from app.slang_blacklist import SlangBlacklist
 
 logger = logging.getLogger(__name__)
@@ -13,14 +14,9 @@ _BLACKLIST_QUERY_SIZE = 50
 
 
 async def script_node(state: WorkflowState, config: RunnableConfig) -> dict:
-    """Call GLM-4.6V to generate random slang + 4 panel comic script.
-
-    Returns: Partial WorkflowState update dict.
-    Raises: LLMTimeoutError, LLMApiError, LLMResponseError, ValueError.
-    """
+    """Call GLM-4.6V to generate random slang + 4 panel comic script."""
     settings = config["configurable"]["settings"]
 
-    # 加载黑名单并构建动态系统提示词
     blacklist = SlangBlacklist(file_path=settings.slang_blacklist_file)
     recent_slangs = blacklist.get_recent(_BLACKLIST_QUERY_SIZE)
     system_prompt = build_system_prompt(recent_slangs)
@@ -39,32 +35,12 @@ async def script_node(state: WorkflowState, config: RunnableConfig) -> dict:
             f"Consider increasing vision_llm_max_tokens (current: {settings.vision_llm_max_tokens})"
         )
 
-    data = LLMClient.extract_json_from_content(response.content)
-
-    # Validate
-    panel_count = data.get("panel_count", 0)
-    panels = data.get("panels", [])
-    if not (3 <= panel_count <= 6):
-        raise ValueError(f"Invalid panel_count: {panel_count}, must be 3-6")
-    if len(panels) != panel_count:
-        raise ValueError(
-            f"panels length ({len(panels)}) != panel_count ({panel_count})"
-        )
-
-    slang = data["slang"]
-    # 成功后将 slang 加入黑名单（失败时不会执行到这里）
-    blacklist.add(slang)
-
-    logger.info(
-        "Script generated: slang='%s', panels=%d",
-        slang,
-        panel_count,
-    )
+    data = validate_and_finalize(response.content, blacklist)
 
     return {
-        "slang": slang,
+        "slang": data["slang"],
         "origin": data["origin"],
         "explanation": data["explanation"],
-        "panel_count": panel_count,
-        "panels": panels,
+        "panel_count": data["panel_count"],
+        "panels": data["panels"],
     }
