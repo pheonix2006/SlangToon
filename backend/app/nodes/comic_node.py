@@ -20,9 +20,17 @@ async def comic_node(state: WorkflowState, config: RunnableConfig) -> dict:
     """
     settings = config["configurable"]["settings"]
     img_client = ImageGenClient(settings)
-    image_base64 = await img_client.generate_from_text(
-        prompt=state["comic_prompt"],
-        size=COMIC_SIZE,
-    )
+    reference_image = state.get("reference_image")
+    if reference_image:
+        image_base64 = await img_client.generate(
+            prompt=state["comic_prompt"],
+            image_base64=reference_image,
+            size=COMIC_SIZE,
+        )
+    else:
+        image_base64 = await img_client.generate_from_text(
+            prompt=state["comic_prompt"],
+            size=COMIC_SIZE,
+        )
     logger.info("Comic image generated: %d characters", len(image_base64))
     return {"image_base64": image_base64}
