@@ -9,7 +9,10 @@ import httpx
 import pytest
 
 from app.config import Settings
-from app.services.llm_client import LLMClient, StreamChunk, LLMTimeoutError, LLMApiError
+from app.services.llm_client import (
+    LLMClient, StreamChunk, LLMTimeoutError, LLMApiError,
+    _extract_reasoning_from_delta,
+)
 
 
 def _make_settings(**overrides) -> Settings:
@@ -180,3 +183,71 @@ class TestChatStream:
         assert call_count == 2
         assert len(chunks) == 1
         assert chunks[0].type == "error"
+
+
+class TestExtractReasoningFromDelta:
+    def test_reasoning_content_field(self):
+        delta = {"reasoning_content": "thinking..."}
+        assert _extract_reasoning_from_delta(delta) == "thinking..."
+
+    def test_reasoning_string_field(self):
+        delta = {"reasoning": "OpenRouter reasoning"}
+        assert _extract_reasoning_from_delta(delta) == "OpenRouter reasoning"
+
+    def test_reasoning_details_array(self):
+        delta = {"reasoning_details": [
+            {"type": "reasoning.text", "text": "step by step"},
+        ]}
+        assert _extract_reasoning_from_delta(delta) == "step by step"
+
+    def test_reasoning_details_multiple_items(self):
+        delta = {"reasoning_details": [
+            {"type": "reasoning.text", "text": "part1"},
+            {"type": "reasoning.text", "text": "part2"},
+        ]}
+        assert _extract_reasoning_from_delta(delta) == "part1part2"
+
+    def test_reasoning_details_skips_non_text(self):
+        delta = {"reasoning_details": [
+            {"type": "reasoning.encrypted", "data": "abc"},
+            {"type": "reasoning.text", "text": "visible"},
+        ]}
+        assert _extract_reasoning_from_delta(delta) == "visible"
+
+    def test_empty_delta(self):
+        assert _extract_reasoning_from_delta({}) == ""
+
+    def test_reasoning_content_takes_priority(self):
+        delta = {"reasoning_content": "native", "reasoning": "alias"}
+        assert _extract_reasoning_from_delta(delta) == "native"
+
+
+class TestChatStreamOpenRouterFormat:
+    @pytest.mark.asyncio
+    async def test_reasoning_details_yields_thinking(self):
+        settings = _make_settings()
+        client = LLMClient(settings)
+        lines = []
+        chunk1 = json.dumps({"choices": [{"delta": {"reasoning_details": [
+            {"type": "reasoning.text", "text": "Let me think"}
+        ]}}]})
+        lines.append(f"data: {chunk1}")
+        chunk2 = json.dumps({"choices": [{"delta": {"content": "result"}}]})
+        lines.append(f"data: {chunk2}")
+        final = json.dumps({"choices": [{"delta": {}, "finish_reason": "stop"}], "usage": {"total_tokens": 20}})
+        lines.append(f"data: {final}")
+        lines.append("data: [DONE]")
+        mock_resp = MockStreamResponse(200, lines)
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "stream", _make_stream_mock(mock_resp))
+            chunks = []
+            async for c in client.chat_stream(system_prompt="s", user_text="u"):
+                chunks.append(c)
+
+        thinking = [c for c in chunks if c.type == "thinking"]
+        assert len(thinking) == 1
+        assert thinking[0].text == "Let me think"
+        done = [c for c in chunks if c.type == "done"]
+        assert done[0].reasoning == "Let me think"
+        assert done[0].content == "result"

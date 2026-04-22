@@ -270,7 +270,7 @@ class LLMClient:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
-        payload = {
+        payload: dict = {
             "model": self._model,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -279,6 +279,7 @@ class LLMClient:
             "max_tokens": self._max_tokens,
             "temperature": temperature,
             "stream": True,
+            "reasoning": {"enabled": True},
         }
 
         last_exc: Exception | None = None
@@ -312,10 +313,10 @@ class LLMClient:
 
                             delta = chunk.get("choices", [{}])[0].get("delta", {})
 
-                            if "reasoning_content" in delta:
-                                text = delta["reasoning_content"]
-                                reasoning_parts.append(text)
-                                yield StreamChunk(type="thinking", text=text)
+                            thinking_text = _extract_reasoning_from_delta(delta)
+                            if thinking_text:
+                                reasoning_parts.append(thinking_text)
+                                yield StreamChunk(type="thinking", text=thinking_text)
 
                             if "content" in delta:
                                 text = delta["content"]
@@ -485,6 +486,34 @@ class LLMClient:
         import asyncio
         delay = base * (2 ** (attempt - 1))
         await asyncio.sleep(delay)
+
+
+def _extract_reasoning_from_delta(delta: dict) -> str:
+    """从 SSE delta 中提取 reasoning 文本，兼容多种 API 格式。
+
+    支持：
+    - DeepSeek/GLM 原生: delta.reasoning_content (string)
+    - OpenRouter 标准化: delta.reasoning (string)
+    - OpenRouter 结构化: delta.reasoning_details (array of {type, text})
+    """
+    if "reasoning_content" in delta and delta["reasoning_content"]:
+        return delta["reasoning_content"]
+
+    if "reasoning" in delta and isinstance(delta["reasoning"], str) and delta["reasoning"]:
+        return delta["reasoning"]
+
+    details = delta.get("reasoning_details")
+    if details and isinstance(details, list):
+        parts = []
+        for item in details:
+            if isinstance(item, dict) and item.get("type") == "reasoning.text":
+                text = item.get("text", "")
+                if text:
+                    parts.append(text)
+        if parts:
+            return "".join(parts)
+
+    return ""
 
 
 def _try_parse_json(text: str) -> dict | None:
