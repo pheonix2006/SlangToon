@@ -16,6 +16,7 @@ from app.services.image_gen.openrouter_provider import OpenRouterProvider
 
 def _make_settings(**overrides) -> Settings:
     defaults = dict(
+        image_gen_provider="dashscope",
         qwen_image_apikey="test-qwen-key",
         qwen_image_base_url="https://dashscope.example.com/api/v1",
         qwen_image_model="qwen-image-2.0",
