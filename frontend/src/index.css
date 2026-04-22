@@ -141,3 +141,23 @@ body {
 .font-accent {
   font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
 }
+
+@keyframes countdown {
+  0% { transform: scale(1.5); opacity: 0; }
+  20% { transform: scale(1); opacity: 1; }
+  80% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0; }
+}
+
+@keyframes flash {
+  0% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+.animate-countdown {
+  animation: countdown 1s ease-out;
+}
+
+.animate-flash {
+  animation: flash 0.3s ease-out forwards;
+}
