@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-from dataclasses import dataclass
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -53,6 +54,17 @@ class LLMResponse:
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.total_tokens,
         }
+
+
+@dataclass
+class StreamChunk:
+    """流式输出的单个 chunk。"""
+
+    type: str          # "thinking" | "content" | "done" | "error"
+    text: str = ""
+    reasoning: str = ""
+    content: str = ""
+    usage: dict = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -245,6 +257,97 @@ class LLMClient:
         raise LLMTimeoutError(
             f"文本请求在 {self._max_retries} 次重试后仍然失败"
         ) from last_exc
+
+    async def chat_stream(
+        self,
+        system_prompt: str,
+        user_text: str,
+        temperature: float = 0.8,
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """流式 LLM 调用，逐 chunk yield thinking/content/done。"""
+        url = f"{self._base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_text},
+            ],
+            "max_tokens": self._max_tokens,
+            "temperature": temperature,
+            "stream": True,
+        }
+
+        last_exc: Exception | None = None
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    async with client.stream("POST", url, json=payload, headers=headers) as resp:
+                        if resp.status_code >= 500:
+                            body = await resp.aread()
+                            last_exc = LLMApiError(f"LLM API 服务端错误 {resp.status_code}")
+                            if attempt < self._max_retries:
+                                await self._backoff(attempt)
+                            continue
+                        await self._check_status(resp)
+
+                        reasoning_parts: list[str] = []
+                        content_parts: list[str] = []
+                        finish_reason: str | None = None
+                        usage: dict = {}
+
+                        async for line in resp.aiter_lines():
+                            if not line.startswith("data: "):
+                                continue
+                            data_str = line[6:]
+                            if data_str.strip() == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data_str)
+                            except json.JSONDecodeError:
+                                continue
+
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+
+                            if "reasoning_content" in delta:
+                                text = delta["reasoning_content"]
+                                reasoning_parts.append(text)
+                                yield StreamChunk(type="thinking", text=text)
+
+                            if "content" in delta:
+                                text = delta["content"]
+                                content_parts.append(text)
+                                yield StreamChunk(type="content", text=text)
+
+                            choice = chunk.get("choices", [{}])[0]
+                            if choice.get("finish_reason"):
+                                finish_reason = choice["finish_reason"]
+                            if "usage" in chunk:
+                                usage = chunk["usage"]
+
+                        yield StreamChunk(
+                            type="done",
+                            reasoning="".join(reasoning_parts),
+                            content="".join(content_parts),
+                            usage=usage,
+                        )
+                        return
+
+            except httpx.TimeoutException as exc:
+                last_exc = exc
+                if attempt < self._max_retries:
+                    await self._backoff(attempt)
+            except LLMApiError:
+                raise
+            except Exception as exc:
+                last_exc = exc
+                if attempt < self._max_retries:
+                    await self._backoff(attempt)
+
+        yield StreamChunk(type="error", text=f"请求在 {self._max_retries} 次重试后失败")
 
     # ------------------------------------------------------------------
     # JSON 提取
