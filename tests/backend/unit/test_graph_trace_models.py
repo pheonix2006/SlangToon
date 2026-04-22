@@ -33,3 +33,23 @@ def test_trace_record_with_error():
     record = TraceRecord(trace_id="t-err", flow_type="script", status="failed", error="timeout")
     assert record.error == "timeout"
     assert record.status == "failed"
+
+
+class TestNodeRecordReasoningContent:
+    def test_default_none(self):
+        record = NodeRecord(name="test_node")
+        assert record.reasoning_content is None
+
+    def test_with_reasoning(self):
+        record = NodeRecord(name="script_node", reasoning_content="I'm thinking about...")
+        assert record.reasoning_content == "I'm thinking about..."
+
+    def test_serialization_includes_reasoning(self):
+        record = NodeRecord(name="n", reasoning_content="think")
+        d = record.model_dump()
+        assert d["reasoning_content"] == "think"
+
+    def test_serialization_excludes_none(self):
+        record = NodeRecord(name="n")
+        d = record.model_dump(exclude_none=True)
+        assert "reasoning_content" not in d

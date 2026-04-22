@@ -8,6 +8,7 @@ class NodeRecord(BaseModel):
 
     name: str
     output: dict | None = None
+    reasoning_content: str | None = None
     timestamp: str = ""
     duration_ms: float = 0
 
