@@ -18,13 +18,13 @@ export default function ThinkingDisplay({ text, isActive }: ThinkingDisplayProps
 
   return (
     <div
-      className={`w-full max-w-md mx-auto mt-6 transition-opacity duration-500 ${
+      className={`w-full max-w-3xl mx-auto mt-6 px-4 transition-opacity duration-500 ${
         isActive ? 'opacity-100' : 'opacity-0'
       }`}
     >
       <div
         ref={containerRef}
-        className="max-h-40 overflow-y-auto px-4 py-3 rounded-lg text-sm font-mono leading-relaxed"
+        className="max-h-[40vh] overflow-y-auto px-6 py-4 rounded-xl text-base font-mono leading-relaxed"
         style={{
           color: 'rgba(255,255,255,0.4)',
           backgroundColor: 'rgba(255,255,255,0.03)',
