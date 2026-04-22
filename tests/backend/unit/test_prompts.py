@@ -99,6 +99,45 @@ class TestBuildComicPrompt:
         for i in range(1, 5):
             assert f"P{i}:" in prompt
 
+    def test_with_reference_image_adds_character_guidance(self):
+        panels = [
+            {"scene": "A cat sits on a windowsill", "dialogue": "Cat: Meow"},
+            {"scene": "The cat sees a bird outside", "dialogue": ""},
+            {"scene": "Cat chases the bird", "dialogue": "Narrator: The hunt begins"},
+            {"scene": "Cat napping after failed chase", "dialogue": ""},
+        ]
+        prompt = build_comic_prompt(
+            slang="Curiosity killed the cat",
+            origin="Western proverb",
+            explanation="Being too curious can lead to trouble",
+            panels=panels,
+            has_reference_image=True,
+        )
+        assert "reference photo" in prompt
+        assert "hairstyle" in prompt
+        assert count_tokens(prompt) <= MAX_PROMPT_TOKENS
+
+    def test_without_reference_image_no_character_guidance(self):
+        panels = [
+            {"scene": "A cat sits on a windowsill", "dialogue": "Cat: Meow"},
+            {"scene": "The cat sees a bird outside", "dialogue": ""},
+            {"scene": "Cat chases the bird", "dialogue": ""},
+            {"scene": "Cat napping", "dialogue": ""},
+        ]
+        prompt = build_comic_prompt(
+            slang="test",
+            origin="test",
+            explanation="test",
+            panels=panels,
+            has_reference_image=False,
+        )
+        assert "reference photo" not in prompt
+
+    def test_default_has_reference_image_is_false(self):
+        panels = [{"scene": "x", "dialogue": ""}] * 4
+        prompt = build_comic_prompt("s", "o", "e", panels)
+        assert "reference photo" not in prompt
+
 
 class TestCountTokens:
     def test_count_tokens_basic(self):

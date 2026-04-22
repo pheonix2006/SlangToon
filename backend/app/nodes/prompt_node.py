@@ -20,6 +20,7 @@ async def prompt_node(state: WorkflowState, config: RunnableConfig) -> dict:
         origin=state["origin"],
         explanation=state["explanation"],
         panels=state["panels"],
+        has_reference_image=bool(state.get("reference_image")),
     )
     logger.info(
         "Comic prompt built: %d characters", len(comic_prompt),

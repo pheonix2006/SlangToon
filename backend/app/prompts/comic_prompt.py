@@ -78,6 +78,7 @@ def build_comic_prompt(
     origin: str,
     explanation: str,
     panels: list[dict],
+    has_reference_image: bool = False,
 ) -> str:
     """Build a visual prompt within Qwen Image 2.0's 1000-token limit.
 
@@ -93,6 +94,14 @@ def build_comic_prompt(
         f"A {panel_count}-panel {layout} manga comic strip, 16:9 landscape. "
         f'Title: "{slang}" ({origin}). All scenes in modern setting. '
     )
+    character_guidance = ""
+    if has_reference_image:
+        character_guidance = (
+            "The main character in all panels should resemble the person "
+            "in the reference photo — same hairstyle, clothing, and general "
+            "appearance, rendered in manga/comic style. "
+        )
+    full_header = header + character_guidance
     footer = (
         " Style: clean manga line art, warm colors, clear panel borders, "
         "white gutters, speech bubbles."
@@ -101,7 +110,7 @@ def build_comic_prompt(
     # Stage 1: full dialogue, progressively shrink scene descriptions
     scene_only_levels = [120, 80, 60, 40]
     for max_scene in scene_only_levels:
-        result = _try_prompt_tokens(panels, header, footer, max_scene, None)
+        result = _try_prompt_tokens(panels, full_header, footer, max_scene, None)
         if result:
             return result
 
@@ -114,12 +123,12 @@ def build_comic_prompt(
         (15, 15),
     ]
     for max_scene, max_dialogue in dialogue_levels:
-        result = _try_prompt_tokens(panels, header, footer, max_scene, max_dialogue)
+        result = _try_prompt_tokens(panels, full_header, footer, max_scene, max_dialogue)
         if result:
             return result
 
     # Stage 3: hard token truncation as last resort
     lines = _build_panel_lines(panels, 15, 15)
     panels_text = " ".join(lines)
-    prompt = header + panels_text + footer
+    prompt = full_header + panels_text + footer
     return _truncate_prompt_to_tokens(prompt, MAX_PROMPT_TOKENS)
