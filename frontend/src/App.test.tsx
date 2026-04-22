@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 import App from './App';
 
 vi.mock('./services/api', () => ({
-  generateScript: vi.fn(),
+  generateScriptStream: vi.fn(),
   generateComic: vi.fn(),
   getHistory: vi.fn().mockResolvedValue({
     data: { items: [], total: 0, page: 1, page_size: 20, total_pages: 0 },
@@ -36,7 +36,7 @@ describe('App (gesture-confirm integration)', () => {
 
   it('shows GestureHint in CAMERA_READY', async () => {
     await act(async () => { render(<App />); });
-    expect(screen.getByText(/Generate/)).toBeInTheDocument();
+    expect(screen.getByText(/Take Photo/)).toBeInTheDocument();
   });
 
   it('enters GALLERY after 20s idle', async () => {
