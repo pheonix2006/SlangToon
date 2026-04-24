@@ -31,6 +31,7 @@ function App() {
   const [_referenceImage, setReferenceImage] = useState<string | null>(null);
   const [thinkingText, setThinkingText] = useState('');
   const [generatingPhase, setGeneratingPhase] = useState<'thinking' | 'comic'>('thinking');
+  const [themeName, setThemeName] = useState('');
 
   const appStateRef = useRef<AppState>(appState);
   const setAppStateSync = useCallback((newState: AppState) => {
@@ -49,6 +50,7 @@ function App() {
     setComicUrl('');
     setReferenceImage(null);
     setError(null);
+    setThemeName('');
     setAppStateSync(AppState.CAMERA_READY);
   }, [setAppStateSync]);
 
@@ -96,6 +98,7 @@ function App() {
         (msg) => {
           throw new Error(msg);
         },
+        (theme) => setThemeName(theme.theme_name_zh),
       );
 
       if (!scriptResult) {
@@ -110,6 +113,7 @@ function App() {
         panel_count: script.panel_count,
         panels: script.panels,
         reference_image: capturedImage,
+        theme_id: script.theme_id,
       });
       setComicUrl(comicResponse.data.comic_url);
       setAppStateSync(AppState.COMIC_READY);
@@ -257,7 +261,13 @@ function App() {
                 <>
                   <LoadingOrb
                     label={generatingPhase === 'thinking' ? 'THINKING' : 'CREATING'}
-                    subtext={generatingPhase === 'thinking' ? 'AI 正在构思剧本...' : '正在生成漫画...'}
+                    subtext={
+                      generatingPhase === 'thinking'
+                        ? 'AI 正在构思剧本...'
+                        : themeName
+                          ? `正在以 ${themeName} 风格创作...`
+                          : '正在生成漫画...'
+                    }
                   />
                   <ThinkingDisplay
                     text={thinkingText}

@@ -146,6 +146,7 @@ export async function generateComic(
     panel_count: number;
     panels: { scene: string; dialogue: string }[];
     reference_image?: string;
+    theme_id?: string;
   },
 ): Promise<ComicResponse> {
   return request<ComicResponse>(
@@ -182,6 +183,7 @@ export async function generateScriptStream(
   onThinking: (text: string) => void,
   onScript: (data: ScriptData) => void,
   onError: (msg: string) => void,
+  onTheme?: (theme: { theme_id: string; theme_name_zh: string }) => void,
 ): Promise<void> {
   const url = `${API_BASE_URL}${API_ENDPOINTS.GENERATE_SCRIPT_STREAM}`;
   const resp = await fetch(url, {
@@ -222,6 +224,9 @@ export async function generateScriptStream(
         switch (currentEvent) {
           case 'thinking':
             onThinking(data.text);
+            break;
+          case 'theme':
+            if (onTheme) onTheme(data);
             break;
           case 'script':
             onScript(data as ScriptData);

@@ -20,6 +20,8 @@ export interface ScriptData {
   explanation: string;
   panel_count: number;
   panels: Panel[];
+  theme_id: string;
+  theme_name_zh: string;
 }
 
 export interface ScriptResponse {
