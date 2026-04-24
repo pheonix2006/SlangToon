@@ -34,12 +34,17 @@ logs/
 
 # Test artifacts
 frontend/test-results/
+tests/manual/output/
+tests/manual/*.png
+tests/manual/*.jpg
+tests/manual/*.webp
 
 # Playwright MCP cache
 .playwright-mcp/
 
 # Debug screenshots (root level)
 /langsmith_*.png
+/gallery-check.png
 
 # Claude Code
 .claude/
