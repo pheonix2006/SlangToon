@@ -252,3 +252,37 @@ class TestBuildSystemPrompt:
         result = build_system_prompt(items)
         for item in items:
             assert item in result
+
+    def test_world_setting_injected_as_rule_6(self):
+        """world_setting 出现时作为 rule 6 注入。"""
+        result = build_system_prompt([], world_setting="A cyberpunk megacity")
+        assert "6. The story is set in the following world: A cyberpunk megacity" in result
+        assert "Write scenes that naturally fit this world" in result
+
+    def test_world_setting_absent_no_extra_rule(self):
+        """无 world_setting 时不注入额外规则。"""
+        result = build_system_prompt([], world_setting="")
+        assert "The story is set in the following world" not in result
+
+    def test_world_setting_with_blacklist_numbering(self):
+        """有 world_setting 时黑名单变为 rule 7。"""
+        result = build_system_prompt(
+            ["Old slang"],
+            world_setting="A cyberpunk megacity",
+        )
+        assert "6. The story is set in the following world: A cyberpunk megacity" in result
+        assert "7. DO NOT pick" in result
+        assert "Old slang" in result
+
+    def test_no_world_setting_blacklist_is_rule_6(self):
+        """无 world_setting 时黑名单仍为 rule 6。"""
+        result = build_system_prompt(["Old slang"])
+        assert "6. DO NOT pick" in result
+        assert "The story is set in the following world" not in result
+
+    def test_world_setting_no_blacklist_only_rule_6(self):
+        """有 world_setting 但无黑名单时只有 rule 6。"""
+        result = build_system_prompt([], world_setting="Ancient Egypt")
+        assert "6. The story is set in the following world: Ancient Egypt" in result
+        assert "DO NOT pick" not in result
+        assert "7." not in result

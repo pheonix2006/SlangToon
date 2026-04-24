@@ -116,3 +116,60 @@ async def test_stream_validation_error(client, tmp_data_dir):
     error_events = [e for e in events if e["event"] == "error"]
     assert len(error_events) == 1
     assert error_events[0]["data"]["code"] == 50002
+
+
+@pytest.mark.asyncio
+async def test_stream_emits_theme_event(client, mock_script_data, tmp_data_dir):
+    """SSE 流式响应包含 theme 事件。"""
+    content_json = json.dumps(mock_script_data)
+
+    async def mock_chat_stream(system_prompt, user_text, temperature=0.8):
+        yield StreamChunk(type="done", reasoning="", content=content_json, usage={})
+
+    mock_bl = MagicMock()
+    mock_bl.get_recent.return_value = []
+
+    with patch("app.routers.script_stream.build_script_context") as mock_ctx, \
+         patch("app.routers.script_stream.LLMClient") as MockLLM, \
+         patch("app.routers.script_stream.validate_and_finalize") as mock_validate:
+        mock_ctx.return_value = ("prompt", mock_bl)
+        MockLLM.return_value.chat_stream = mock_chat_stream
+        mock_validate.return_value = mock_script_data
+
+        resp = await client.post("/api/generate-script-stream", json={})
+
+    events = _parse_sse_events(resp.text)
+    event_types = [e["event"] for e in events]
+    assert "theme" in event_types
+
+    theme_event = next(e for e in events if e["event"] == "theme")
+    assert "theme_id" in theme_event["data"]
+    assert "theme_name_zh" in theme_event["data"]
+
+
+@pytest.mark.asyncio
+async def test_stream_theme_event_before_thinking(client, mock_script_data, tmp_data_dir):
+    """theme 事件在 thinking 事件之前发出。"""
+    content_json = json.dumps(mock_script_data)
+
+    async def mock_chat_stream(system_prompt, user_text, temperature=0.8):
+        yield StreamChunk(type="thinking", text="Thinking...")
+        yield StreamChunk(type="done", reasoning="Thinking...", content=content_json, usage={})
+
+    mock_bl = MagicMock()
+    mock_bl.get_recent.return_value = []
+
+    with patch("app.routers.script_stream.build_script_context") as mock_ctx, \
+         patch("app.routers.script_stream.LLMClient") as MockLLM, \
+         patch("app.routers.script_stream.validate_and_finalize") as mock_validate:
+        mock_ctx.return_value = ("prompt", mock_bl)
+        MockLLM.return_value.chat_stream = mock_chat_stream
+        mock_validate.return_value = mock_script_data
+
+        resp = await client.post("/api/generate-script-stream", json={})
+
+    events = _parse_sse_events(resp.text)
+    event_types = [e["event"] for e in events]
+    theme_idx = event_types.index("theme")
+    thinking_idx = event_types.index("thinking")
+    assert theme_idx < thinking_idx

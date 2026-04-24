@@ -129,3 +129,24 @@ async def test_generate_script_failed_saves_trace(client, tmp_data_dir):
     trace_data = json.loads(last_line)
     assert trace_data["flow_type"] == "script"
     assert trace_data["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_generate_script_includes_theme_fields(client, mock_script_data):
+    """Successful response includes theme_id and theme_name_zh."""
+    mock_client = _mock_llm_client(mock_script_data)
+
+    with patch("app.nodes.script_node.LLMClient", return_value=mock_client), \
+         patch("app.nodes.script_node.LLMClient.extract_json_from_content",
+               side_effect=lambda c: json.loads(c) if isinstance(c, str) else c):
+        resp = await client.post("/api/generate-script", json={})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["code"] == 0
+    assert "theme_id" in data["data"]
+    assert "theme_name_zh" in data["data"]
+    assert isinstance(data["data"]["theme_id"], str)
+    assert len(data["data"]["theme_id"]) > 0
+    assert isinstance(data["data"]["theme_name_zh"], str)
+    assert len(data["data"]["theme_name_zh"]) > 0

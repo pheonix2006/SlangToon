@@ -24,26 +24,43 @@ Reimagine its core meaning in a CONTEMPORARY setting (office, campus, city, soci
 3. All scenes in present-day with modern characters, clothing, technology
 4. Scene descriptions: under 50 words each. Dialogue: under 20 words each
 5. CRITICAL JSON RULE: Never use literal double quotes inside string values. Use single quotes instead (e.g. 'Great job!' not "Great job!"). All dialogue must go in the "dialogue" field, not embedded in "scene"
+{world_setting_section}\
 {blacklist_section}\
 """
 
 
-def build_system_prompt(blacklist: list[str]) -> str:
+def build_system_prompt(blacklist: list[str], world_setting: str = "") -> str:
     """构建系统提示词，将黑名单嵌入 RULES 区块中。
 
     Args:
         blacklist: 已生成过的俚语列表。为空时不追加黑名单约束。
+        world_setting: 主题世界设定。为空时不追加世界设定约束。
     Returns:
         完整的系统提示词字符串。
     """
+    # Determine rule numbering based on whether world_setting is present
+    world_rule_num = 6
+    blacklist_rule_num = 7 if world_setting else 6
+
+    if world_setting:
+        world_setting_section = (
+            f"\n{world_rule_num}. The story is set in the following world: {world_setting}\n"
+            f"   Write scenes that naturally fit this world's aesthetic, technology level, and culture.\n"
+        )
+    else:
+        world_setting_section = ""
+
     if blacklist:
         items = "\n".join(f"   {i+1}. {s}" for i, s in enumerate(blacklist))
         blacklist_section = (
-            f"\n6. DO NOT pick any of these already-used expressions:\n"
+            f"\n{blacklist_rule_num}. DO NOT pick any of these already-used expressions:\n"
             f"{items}\n"
             f"   You MUST pick something DIFFERENT from this list."
         )
     else:
         blacklist_section = ""
 
-    return SCRIPT_SYSTEM_PROMPT_TEMPLATE.format(blacklist_section=blacklist_section)
+    return SCRIPT_SYSTEM_PROMPT_TEMPLATE.format(
+        world_setting_section=world_setting_section,
+        blacklist_section=blacklist_section,
+    )

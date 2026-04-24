@@ -9,6 +9,7 @@ from app.dependencies import get_cached_settings
 from app.schemas.common import ApiResponse, ErrorCode
 from app.schemas.script import ScriptRequest, ScriptResponse, Panel
 from app.services.llm_client import LLMTimeoutError, LLMApiError, LLMResponseError
+from app.prompts.theme_packs import get_random_theme
 from app.graphs.trace_collector import GraphExecutionError
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,8 @@ async def generate_script_endpoint(
 
     graph = build_script_graph()
 
+    theme = get_random_theme()
+
     def _set_trace_id(tid: str | None):
         if tid and response:
             response.headers["x-trace-id"] = tid
@@ -40,7 +43,7 @@ async def generate_script_endpoint(
     try:
         result, trace_id = await invoke_with_trace(
             graph,
-            {"trigger": "ok_gesture"},
+            {"trigger": "ok_gesture", "theme_id": theme["id"], "theme_name_zh": theme["name_zh"]},
             settings,
             flow_type="script",
             request_id=request_id_ctx.get(""),
@@ -66,5 +69,7 @@ async def generate_script_endpoint(
         explanation=result["explanation"],
         panel_count=result["panel_count"],
         panels=[Panel(**p) for p in result["panels"]],
+        theme_id=theme["id"],
+        theme_name_zh=theme["name_zh"],
     )
     return ApiResponse(data=response_data.model_dump())

@@ -223,3 +223,84 @@ async def test_script_node_empty_blacklist_uses_base_prompt(tmp_data_dir):
         await script_node({"trigger": "ok_gesture"}, _make_config(settings))
     assert captured == base_prompt
     assert "DO NOT pick" not in captured
+
+
+@pytest.mark.asyncio
+async def test_script_node_with_theme_id_injects_world_setting(tmp_data_dir):
+    """N-05: theme_id 存在时 prompt 包含对应的 world_setting。"""
+    from app.config import Settings
+    settings = Settings()
+    mock_data = {"slang": "Test", "origin": "T", "explanation": "T",
+                 "panel_count": 4, "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(4)]}
+    mock_bl = MagicMock()
+    mock_bl.get_recent.return_value = []
+    captured = {}
+    async def capture(system_prompt, **kw):
+        captured["sp"] = system_prompt
+        return LLMResponse(content=json.dumps(mock_data), model="glm-4.6v")
+    with patch("app.nodes.script_node.SlangBlacklist") as MockBL, \
+         patch("app.nodes.script_node.LLMClient") as MockClient:
+        MockBL.return_value = mock_bl
+        MockClient.return_value.chat = capture
+        MockClient.extract_json_from_content = staticmethod(lambda c: json.loads(c))
+        result = await script_node(
+            {"trigger": "ok_gesture", "theme_id": "cyberpunk"},
+            _make_config(settings),
+        )
+    assert "neon-lit megacity" in captured["sp"]
+    assert "The story is set in the following world" in captured["sp"]
+    assert result["slang"] == "Test"
+
+
+@pytest.mark.asyncio
+async def test_script_node_with_unknown_theme_id_no_world_setting(tmp_data_dir):
+    """N-06: theme_id 不存在时不注入 world_setting。"""
+    from app.config import Settings
+    from app.prompts.script_prompt import build_system_prompt
+    base_prompt = build_system_prompt([])
+    settings = Settings()
+    mock_data = {"slang": "Test", "origin": "T", "explanation": "T",
+                 "panel_count": 4, "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(4)]}
+    mock_bl = MagicMock()
+    mock_bl.get_recent.return_value = []
+    captured = None
+    async def capture(system_prompt, **kw):
+        nonlocal captured
+        captured = system_prompt
+        return LLMResponse(content=json.dumps(mock_data), model="glm-4.6v")
+    with patch("app.nodes.script_node.SlangBlacklist") as MockBL, \
+         patch("app.nodes.script_node.LLMClient") as MockClient:
+        MockBL.return_value = mock_bl
+        MockClient.return_value.chat = capture
+        MockClient.extract_json_from_content = staticmethod(lambda c: json.loads(c))
+        await script_node(
+            {"trigger": "ok_gesture", "theme_id": "nonexistent"},
+            _make_config(settings),
+        )
+    assert captured == base_prompt
+    assert "The story is set in the following world" not in captured
+
+
+@pytest.mark.asyncio
+async def test_script_node_without_theme_id_no_world_setting(tmp_data_dir):
+    """N-07: 无 theme_id 时不注入 world_setting。"""
+    from app.config import Settings
+    from app.prompts.script_prompt import build_system_prompt
+    base_prompt = build_system_prompt([])
+    settings = Settings()
+    mock_data = {"slang": "Test", "origin": "T", "explanation": "T",
+                 "panel_count": 4, "panels": [{"scene": f"S{i}", "dialogue": ""} for i in range(4)]}
+    mock_bl = MagicMock()
+    mock_bl.get_recent.return_value = []
+    captured = None
+    async def capture(system_prompt, **kw):
+        nonlocal captured
+        captured = system_prompt
+        return LLMResponse(content=json.dumps(mock_data), model="glm-4.6v")
+    with patch("app.nodes.script_node.SlangBlacklist") as MockBL, \
+         patch("app.nodes.script_node.LLMClient") as MockClient:
+        MockBL.return_value = mock_bl
+        MockClient.return_value.chat = capture
+        MockClient.extract_json_from_content = staticmethod(lambda c: json.loads(c))
+        await script_node({"trigger": "ok_gesture"}, _make_config(settings))
+    assert captured == base_prompt

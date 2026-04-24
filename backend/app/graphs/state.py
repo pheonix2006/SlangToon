@@ -14,6 +14,8 @@ class WorkflowState(TypedDict, total=False):
     # -- Input --
     trigger: str  # trigger type (reserved for extension)
     reference_image: str  # 观众照片 base64（可选，图生图时使用）
+    theme_id: str  # theme pack id (optional)
+    theme_name_zh: str  # theme pack Chinese name (optional)
 
     # -- Script stage (script_node output) --
     slang: str

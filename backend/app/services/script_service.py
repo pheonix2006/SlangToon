@@ -11,11 +11,11 @@ logger = logging.getLogger(__name__)
 _BLACKLIST_QUERY_SIZE = 50
 
 
-def build_script_context(settings) -> tuple[str, SlangBlacklist]:
+def build_script_context(settings, world_setting: str = "") -> tuple[str, SlangBlacklist]:
     """加载黑名单，构建 system_prompt。"""
     blacklist = SlangBlacklist(file_path=settings.slang_blacklist_file)
     recent_slangs = blacklist.get_recent(_BLACKLIST_QUERY_SIZE)
-    system_prompt = build_system_prompt(recent_slangs)
+    system_prompt = build_system_prompt(recent_slangs, world_setting=world_setting)
     return system_prompt, blacklist
 
 

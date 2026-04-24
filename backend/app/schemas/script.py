@@ -38,3 +38,5 @@ class ScriptResponse(BaseModel):
     explanation: str
     panel_count: int
     panels: list[Panel]
+    theme_id: str = ""
+    theme_name_zh: str = ""

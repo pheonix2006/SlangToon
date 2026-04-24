@@ -14,6 +14,7 @@ from app.schemas.common import ErrorCode
 from app.schemas.script import ScriptRequest
 from app.services.llm_client import LLMClient, LLMTimeoutError, LLMApiError, LLMResponseError
 from app.services.script_service import build_script_context, validate_and_finalize
+from app.prompts.theme_packs import get_random_theme
 from app.graphs.trace_models import TraceRecord, NodeRecord
 from app.graphs.trace_store import TraceStore
 
@@ -43,7 +44,14 @@ async def generate_script_stream_endpoint(
         status = "success"
 
         try:
-            system_prompt, blacklist = build_script_context(settings)
+            theme = get_random_theme()
+            system_prompt, blacklist = build_script_context(
+                settings, world_setting=theme["world_setting"]
+            )
+            yield _sse_event("theme", {
+                "theme_id": theme["id"],
+                "theme_name_zh": theme["name_zh"],
+            })
             llm = LLMClient(settings)
 
             async for chunk in llm.chat_stream(

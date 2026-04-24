@@ -26,6 +26,27 @@ class TestBuildScriptContext:
         assert "Old Slang A" in prompt
         assert "DO NOT pick" in prompt
 
+    def test_world_setting_passed_to_prompt(self, tmp_data_dir):
+        """world_setting 参数传入后出现在 prompt 中。"""
+        from app.config import Settings
+        settings = Settings()
+        mock_bl = MagicMock()
+        mock_bl.get_recent.return_value = []
+        with patch("app.services.script_service.SlangBlacklist", return_value=mock_bl):
+            prompt, _ = build_script_context(settings, world_setting="A neon-lit megacity")
+        assert "A neon-lit megacity" in prompt
+        assert "6. The story is set in the following world" in prompt
+
+    def test_no_world_setting_no_extra_rule(self, tmp_data_dir):
+        """不传 world_setting 时 prompt 不包含世界设定规则。"""
+        from app.config import Settings
+        settings = Settings()
+        mock_bl = MagicMock()
+        mock_bl.get_recent.return_value = []
+        with patch("app.services.script_service.SlangBlacklist", return_value=mock_bl):
+            prompt, _ = build_script_context(settings)
+        assert "The story is set in the following world" not in prompt
+
 
 class TestValidateAndFinalize:
     def test_valid_4_panels(self, tmp_data_dir):
