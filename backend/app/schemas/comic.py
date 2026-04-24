@@ -11,6 +11,7 @@ class ComicRequest(BaseModel):
     panel_count: int = Field(..., ge=3, le=6, description="Number of panels")
     panels: list[Panel] = Field(..., min_length=3, max_length=6, description="Panel descriptions")
     reference_image: str | None = Field(None, description="观众照片 base64 (data:image/...;base64,...)")
+    theme_id: str = Field("", description="Theme pack ID for visual style lookup")
 
 
 class ComicResponse(BaseModel):

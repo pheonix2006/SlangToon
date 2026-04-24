@@ -138,6 +138,39 @@ class TestBuildComicPrompt:
         prompt = build_comic_prompt("s", "o", "e", panels)
         assert "reference photo" not in prompt
 
+    def test_visual_style_replaces_default_footer(self):
+        """When visual_style is provided, it replaces the default manga footer."""
+        panels = [{"scene": "x", "dialogue": ""}] * 4
+        prompt = build_comic_prompt(
+            "s", "o", "e", panels,
+            visual_style="Neon cyberpunk art with glowing lights",
+        )
+        assert "Neon cyberpunk art with glowing lights" in prompt
+        assert "clean manga line art" not in prompt
+
+    def test_empty_visual_style_uses_default_footer(self):
+        """When visual_style is empty string, default manga footer is used."""
+        panels = [{"scene": "x", "dialogue": ""}] * 4
+        prompt = build_comic_prompt("s", "o", "e", panels, visual_style="")
+        assert "clean manga line art" in prompt
+
+    def test_no_visual_style_uses_default_footer(self):
+        """When visual_style is not provided, default manga footer is used."""
+        panels = [{"scene": "x", "dialogue": ""}] * 4
+        prompt = build_comic_prompt("s", "o", "e", panels)
+        assert "clean manga line art" in prompt
+
+    def test_visual_style_within_token_limit(self):
+        """Prompt with custom visual_style should still be within token limit."""
+        panels = [
+            {"scene": "x" * 200, "dialogue": "y" * 100}
+        ] * 4
+        prompt = build_comic_prompt(
+            "s", "o", "e", panels,
+            visual_style="Some very long visual style description " * 10,
+        )
+        assert count_tokens(prompt) <= MAX_PROMPT_TOKENS
+
 
 class TestCountTokens:
     def test_count_tokens_basic(self):

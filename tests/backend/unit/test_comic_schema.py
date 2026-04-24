@@ -44,3 +44,38 @@ class TestComicRequestReferenceImage:
         req = ComicRequest(**self._base_data())
         dumped = req.model_dump()
         assert dumped["reference_image"] is None
+
+
+class TestComicRequestThemeId:
+
+    def _base_data(self, **overrides):
+        data = {
+            "slang": "Break a leg",
+            "origin": "Western theater",
+            "explanation": "Good luck",
+            "panel_count": 4,
+            "panels": [
+                {"scene": f"Scene {i}", "dialogue": f"Line {i}"}
+                for i in range(4)
+            ],
+        }
+        data.update(overrides)
+        return data
+
+    def test_default_theme_id_is_empty_string(self):
+        req = ComicRequest(**self._base_data())
+        assert req.theme_id == ""
+
+    def test_with_theme_id(self):
+        req = ComicRequest(**self._base_data(theme_id="cyberpunk"))
+        assert req.theme_id == "cyberpunk"
+
+    def test_model_dump_includes_theme_id(self):
+        req = ComicRequest(**self._base_data(theme_id="ghibli"))
+        dumped = req.model_dump()
+        assert dumped["theme_id"] == "ghibli"
+
+    def test_model_dump_default_theme_id(self):
+        req = ComicRequest(**self._base_data())
+        dumped = req.model_dump()
+        assert dumped["theme_id"] == ""

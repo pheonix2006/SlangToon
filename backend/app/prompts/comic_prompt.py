@@ -79,6 +79,7 @@ def build_comic_prompt(
     explanation: str,
     panels: list[dict],
     has_reference_image: bool = False,
+    visual_style: str = "",
 ) -> str:
     """Build a visual prompt within Qwen Image 2.0's 1000-token limit.
 
@@ -102,10 +103,13 @@ def build_comic_prompt(
             "appearance, rendered in manga/comic style. "
         )
     full_header = header + character_guidance
-    footer = (
-        " Style: clean manga line art, warm colors, clear panel borders, "
-        "white gutters, speech bubbles."
-    )
+    if visual_style:
+        footer = f" Style: {visual_style}."
+    else:
+        footer = (
+            " Style: clean manga line art, warm colors, clear panel borders, "
+            "white gutters, speech bubbles."
+        )
 
     # Stage 1: full dialogue, progressively shrink scene descriptions
     scene_only_levels = [120, 80, 60, 40]
