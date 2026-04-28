@@ -14,7 +14,7 @@
 | Backend | FastAPI, Python 3.12, LangGraph |
 | Gesture | MediaPipe Hands (OK / Open Palm / Wave) |
 | Text LLM | GLM-4.6V (Zhipu BigModel, OpenAI-compatible) |
-| Image Gen | Qwen Image 2.0 (DashScope) / Gemini 2.5 Flash (OpenRouter) — provider switchable |
+| Image Gen | Qwen Image 2.0 (DashScope) / Gemini 3.1 Flash (OpenRouter) / GPT-Image-2 (Replicate) — provider switchable |
 | Package | `uv` (Python), `npm` (Frontend) |
 | Config | `pydantic-settings` + `.env` |
 | Tracing | LangSmith (optional, 7-day retention) |
@@ -22,7 +22,7 @@
 ### Core Workflow
 
 ```
-Camera -> OK gesture -> GLM-4.6V generates slang + script (deduplicated) -> User preview -> Confirmed -> Qwen/Gemini generates image
+Camera -> OK gesture -> GLM-4.6V generates slang + script (deduplicated) -> User preview -> Confirmed -> Qwen/Gemini/GPT-Image-2 generates image
      -> Display comic -> [20s idle] -> Art Gallery (history carousel) -> [Wave] -> Back to camera
 ```
 
@@ -59,7 +59,7 @@ Camera -> OK gesture -> GLM-4.6V generates slang + script (deduplicated) -> User
 ### Requirements
 
 - Python 3.12+, Node.js 18+, [uv](https://docs.astral.sh/uv/)
-- API Keys: Zhipu BigModel (GLM-4.6V) + DashScope (Qwen Image 2.0) or OpenRouter (Gemini 2.5 Flash)
+- API Keys: Zhipu BigModel (GLM-4.6V) + DashScope (Qwen Image 2.0) or OpenRouter (Gemini 3.1 Flash) or Replicate (GPT-Image-2)
 
 ---
 
@@ -92,7 +92,8 @@ SlangToon/
 │       │   ├── image_gen/              # Provider abstraction layer
 │       │   │   ├── base.py             # BaseImageGenProvider (abstract)
 │       │   │   ├── dashscope_provider.py   # Qwen Image 2.0
-│       │   │   ├── openrouter_provider.py  # Gemini 2.5 Flash
+│       │   │   ├── openrouter_provider.py  # Gemini 3.1 Flash
+│       │   │   ├── replicate_provider.py   # GPT-Image-2 (via Replicate)
 │       │   │   └── factory.py          # create_image_gen_client()
 │       │   ├── history_service.py      # History CRUD (JSON file)
 │       │   └── comic_service.py        # (legacy, now handled by graph)
@@ -250,7 +251,7 @@ def test_<method>_<scenario>_<expected>(): ...
 - FastAPI + Pydantic v2, `httpx` async with retry + backoff
 - `pydantic-settings` from `../.env`, `logging.getLogger(__name__)`
 - Custom exceptions per client: `LLMTimeoutError`, `LLMApiError`, `ImageGenApiError`, `ImageGenTimeoutError`
-- Image gen provider abstraction: `BaseImageGenProvider` -> DashScope / OpenRouter (factory pattern)
+- Image gen provider abstraction: `BaseImageGenProvider` -> DashScope / OpenRouter / Replicate (factory pattern)
 - Type annotations: Python 3.12 style
 
 ### TypeScript Frontend
@@ -264,7 +265,7 @@ def test_<method>_<scenario>_<expected>(): ...
 ### Principles
 
 - **S**: Routers = HTTP only, business logic in services/nodes, data in schemas
-- **O**: Extend via Pydantic models, image gen via provider abstraction
+- **O**: Extend via Pydantic models, image gen via provider abstraction (DashScope / OpenRouter / Replicate)
 - **D**: Settings injected, image gen via factory
 - **KISS**: No over-abstraction for current scale
 - **DRY**: Shared fixtures in conftest, shared types in `types/index.ts`

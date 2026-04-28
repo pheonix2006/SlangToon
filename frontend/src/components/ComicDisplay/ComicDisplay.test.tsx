@@ -14,6 +14,16 @@ describe('ComicDisplay (immersive)', () => {
     expect(screen.getByText(/No cap/)).toBeInTheDocument();
   });
 
+  it('renders explanation when provided', () => {
+    render(<ComicDisplay comicUrl="/test.png" slang="No cap" explanation="This means for real" />);
+    expect(screen.getByText('This means for real')).toBeInTheDocument();
+  });
+
+  it('hides explanation when not provided', () => {
+    render(<ComicDisplay comicUrl="/test.png" slang="No cap" />);
+    expect(screen.queryByText(/means/)).not.toBeInTheDocument();
+  });
+
   it('has no buttons', () => {
     const { container } = render(<ComicDisplay comicUrl="/test.png" slang="No cap" />);
     expect(container.querySelectorAll('button')).toHaveLength(0);

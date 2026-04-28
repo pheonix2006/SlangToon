@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 interface ComicDisplayProps {
   comicUrl: string;
   slang: string;
+  explanation?: string;
 }
 
-export default function ComicDisplay({ comicUrl, slang }: ComicDisplayProps) {
+export default function ComicDisplay({ comicUrl, slang, explanation }: ComicDisplayProps) {
   const [labelVisible, setLabelVisible] = useState(true);
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export default function ComicDisplay({ comicUrl, slang }: ComicDisplayProps) {
       />
       <div
         data-testid="comic-label"
-        className="absolute bottom-8 left-8 transition-opacity duration-1000"
+        className="absolute bottom-8 left-8 right-8 transition-opacity duration-1000"
         style={{ opacity: labelVisible ? 1 : 0 }}
       >
         <p
@@ -36,6 +37,14 @@ export default function ComicDisplay({ comicUrl, slang }: ComicDisplayProps) {
         >
           &ldquo;{slang}&rdquo;
         </p>
+        {explanation && (
+          <p
+            className="text-sm mt-1 leading-relaxed"
+            style={{ color: 'rgba(255,255,255,0.5)' }}
+          >
+            {explanation}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -1,29 +1,28 @@
-"""System prompt for reinterpreting classical idioms/proverbs as modern comics."""
+"""System prompt for reinterpreting classical idioms/proverbs as themed visual comics."""
 SCRIPT_SYSTEM_PROMPT_TEMPLATE = """\
-You are a comic scriptwriter who reinterprets classical idioms and proverbs as modern comics.
+You are a comic scriptwriter who reinterprets classical idioms and proverbs as visual comics.
 
 ## TASK
 Pick a classical idiom or proverb from any culture (English, Latin, Chinese, French, Greek, Japanese, etc.). Choose one with genuine cultural depth — rooted in history, philosophy, or traditional wisdom. Do NOT use modern internet slang.
 
-Reimagine its core meaning in a CONTEMPORARY setting (office, campus, city, social media, etc.). Do NOT retell the original historical story. Show the old wisdom through a fresh modern lens.
+Express its core meaning through vivid, visual storytelling. Do NOT retell the original historical story — reimagine the wisdom in a fresh way.
 
 ## OUTPUT FORMAT (JSON only, no other text)
 {{
   "slang": "the idiom in its original language",
   "origin": "Short label, e.g. 'Latin, Horace' or 'Chinese proverb'",
-  "explanation": "2-3 sentences in English. First explain the literal image or origin story behind the expression (e.g. the historical anecdote, fable, or metaphor it comes from). Then state what it means today in plain language. Write for someone who has never heard this expression.",
+  "explanation": "2-3 sentences in English. First explain the literal image or origin story behind the expression. Then state what it means in plain language.",
   "panel_count": 4,
   "panels": [
-    {{"scene": "Under 50 words. Modern setting with vivid details (colors, lighting, expressions).", "dialogue": "Under 20 words. Natural modern speech. Can be empty string."}}
+    {{"scene": "Concise visual description — focus on what can be drawn: colors, lighting, composition.", "dialogue": "Short speech fitting the world. Can be empty string."}}
   ]
 }}
 
 ## RULES
-1. panels array must have EXACTLY 4 entries (panel_count is always 4)
-2. Tell the story in 4 panels: setup, development, climax, resolution
-3. All scenes in present-day with modern characters, clothing, technology
-4. Scene descriptions: under 50 words each. Dialogue: under 20 words each
-5. CRITICAL JSON RULE: Never use literal double quotes inside string values. Use single quotes instead (e.g. 'Great job!' not "Great job!"). All dialogue must go in the "dialogue" field, not embedded in "scene"
+1. panel_count: 3 to 6. Choose the number that best serves the story.
+2. Craft a compelling visual narrative arc. Panels can vary in emphasis — use more detail for key moments, less for transitions.
+3. Scene descriptions should be concise and highly visual — describe what the artist should draw, not what characters think.
+4. CRITICAL: Never use literal double quotes inside string values. Use single quotes instead (e.g. 'Great job!' not "Great job!").
 {world_setting_section}\
 {blacklist_section}\
 """
@@ -38,22 +37,21 @@ def build_system_prompt(blacklist: list[str], world_setting: str = "") -> str:
     Returns:
         完整的系统提示词字符串。
     """
-    # Determine rule numbering based on whether world_setting is present
-    world_rule_num = 6
-    blacklist_rule_num = 7 if world_setting else 6
+    next_rule = 5
 
     if world_setting:
         world_setting_section = (
-            f"\n{world_rule_num}. The story is set in the following world: {world_setting}\n"
-            f"   Write scenes that naturally fit this world's aesthetic, technology level, and culture.\n"
+            f"\n{next_rule}. The story is set in the following world: {world_setting}\n"
+            f"   All scenes, characters, and dialogue must naturally fit this world's aesthetic, technology level, and culture.\n"
         )
+        next_rule += 1
     else:
         world_setting_section = ""
 
     if blacklist:
         items = "\n".join(f"   {i+1}. {s}" for i, s in enumerate(blacklist))
         blacklist_section = (
-            f"\n{blacklist_rule_num}. DO NOT pick any of these already-used expressions:\n"
+            f"\n{next_rule}. DO NOT pick any of these already-used expressions:\n"
             f"{items}\n"
             f"   You MUST pick something DIFFERENT from this list."
         )

@@ -7,6 +7,7 @@ import base64
 import json
 import logging
 
+import httpx
 import replicate as replicate_sdk
 
 from app.services.image_gen.base import (
@@ -94,18 +95,22 @@ class ReplicateProvider:
 
     async def _run(self, input_params: dict) -> str:
         """调用 Replicate API 并返回 base64 data URL。"""
-        client = replicate_sdk.Client(api_token=self._api_key)
+        # httpx.Timeout 同时控制 API 轮询和图片下载的 socket 超时
+        client = replicate_sdk.Client(
+            api_token=self._api_key,
+            timeout=httpx.Timeout(self._timeout, connect=30.0),
+        )
 
         try:
-            output = await asyncio.wait_for(
-                asyncio.to_thread(client.run, self._model, input=input_params),
-                timeout=self._timeout,
+            output = await asyncio.to_thread(
+                client.run, self._model, input=input_params,
             )
-        except asyncio.TimeoutError as exc:
-            raise ImageGenTimeoutError(
-                f"Replicate 请求超时 ({self._timeout}s)"
-            ) from exc
         except Exception as exc:
+            msg = str(exc)
+            if "timed out" in msg.lower():
+                raise ImageGenTimeoutError(
+                    f"Replicate 请求超时 ({self._timeout}s): {exc}"
+                ) from exc
             raise ImageGenApiError(
                 f"Replicate API 调用失败: {exc}"
             ) from exc
@@ -115,7 +120,14 @@ class ReplicateProvider:
 
         file_output = output[0] if isinstance(output, list) else output
         try:
-            image_bytes = await asyncio.to_thread(file_output.read)
+            image_bytes = await asyncio.wait_for(
+                asyncio.to_thread(file_output.read),
+                timeout=60.0,
+            )
+        except asyncio.TimeoutError as exc:
+            raise ImageGenTimeoutError(
+                f"Replicate 图片下载超时: {exc}"
+            ) from exc
         except Exception as exc:
             raise ImageGenApiError(
                 f"Replicate 图片下载失败: {exc}"

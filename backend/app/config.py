@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # Replicate image generation
     replicate_api_token: str = ""
     replicate_image_model: str = "openai/gpt-image-2"
-    replicate_image_timeout: int = 120
+    replicate_image_timeout: int = 300
     replicate_image_max_retries: int = 3
     replicate_image_extra_params: str = ""  # JSON string, e.g. '{"quality":"auto","moderation":"auto"}'
 

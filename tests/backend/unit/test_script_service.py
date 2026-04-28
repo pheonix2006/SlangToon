@@ -35,7 +35,7 @@ class TestBuildScriptContext:
         with patch("app.services.script_service.SlangBlacklist", return_value=mock_bl):
             prompt, _ = build_script_context(settings, world_setting="A neon-lit megacity")
         assert "A neon-lit megacity" in prompt
-        assert "6. The story is set in the following world" in prompt
+        assert "5. The story is set in the following world" in prompt
 
     def test_no_world_setting_no_extra_rule(self, tmp_data_dir):
         """不传 world_setting 时 prompt 不包含世界设定规则。"""

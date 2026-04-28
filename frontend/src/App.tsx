@@ -284,6 +284,7 @@ function App() {
           <ComicDisplay
             comicUrl={comicUrl}
             slang={scriptData?.slang ?? ''}
+            explanation={scriptData?.explanation}
           />
         )}
 
