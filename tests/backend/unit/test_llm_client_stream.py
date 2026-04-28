@@ -222,6 +222,68 @@ class TestExtractReasoningFromDelta:
         assert _extract_reasoning_from_delta(delta) == "native"
 
 
+class TestChatStreamVision:
+    @pytest.mark.asyncio
+    async def test_vision_payload_with_image(self):
+        """When image_base64 is provided, user message is multimodal content list."""
+        settings = _make_settings()
+        client = LLMClient(settings)
+        captured_payload = {}
+
+        lines = _build_thinking_sse_lines("", "hello")
+        mock_resp = MockStreamResponse(200, lines)
+
+        @asynccontextmanager
+        async def capturing_stream(self, method, url, **kwargs):
+            nonlocal captured_payload
+            captured_payload = kwargs.get("json", {})
+            yield mock_resp
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "stream", capturing_stream)
+            async for _ in client.chat_stream(
+                system_prompt="sys",
+                user_text="go",
+                image_base64="data:image/jpeg;base64,abc123",
+            ):
+                pass
+
+        user_msg = captured_payload["messages"][1]
+        assert isinstance(user_msg["content"], list)
+        assert user_msg["content"][0]["type"] == "image_url"
+        assert user_msg["content"][0]["image_url"]["url"] == "data:image/jpeg;base64,abc123"
+        assert user_msg["content"][1]["type"] == "text"
+        assert user_msg["content"][1]["text"] == "go"
+
+    @pytest.mark.asyncio
+    async def test_vision_payload_without_image(self):
+        """When image_base64 is None, user message is plain text string."""
+        settings = _make_settings()
+        client = LLMClient(settings)
+        captured_payload = {}
+
+        lines = _build_thinking_sse_lines("", "hello")
+        mock_resp = MockStreamResponse(200, lines)
+
+        @asynccontextmanager
+        async def capturing_stream(self, method, url, **kwargs):
+            nonlocal captured_payload
+            captured_payload = kwargs.get("json", {})
+            yield mock_resp
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(httpx.AsyncClient, "stream", capturing_stream)
+            async for _ in client.chat_stream(
+                system_prompt="sys",
+                user_text="go",
+            ):
+                pass
+
+        user_msg = captured_payload["messages"][1]
+        assert isinstance(user_msg["content"], str)
+        assert user_msg["content"] == "go"
+
+
 class TestChatStreamOpenRouterFormat:
     @pytest.mark.asyncio
     async def test_reasoning_details_yields_thinking(self):

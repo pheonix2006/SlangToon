@@ -263,6 +263,7 @@ class LLMClient:
         system_prompt: str,
         user_text: str,
         temperature: float = 0.8,
+        image_base64: str | None = None,
     ) -> AsyncGenerator[StreamChunk, None]:
         """流式 LLM 调用，逐 chunk yield thinking/content/done。"""
         url = f"{self._base_url}/chat/completions"
@@ -270,11 +271,20 @@ class LLMClient:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
+        if image_base64:
+            image_url = image_base64 if image_base64.startswith("data:") else f"data:image/jpeg;base64,{image_base64}"
+            user_content: str | list = [
+                {"type": "image_url", "image_url": {"url": image_url}},
+                {"type": "text", "text": user_text},
+            ]
+        else:
+            user_content = user_text
+
         payload: dict = {
             "model": self._model,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_text},
+                {"role": "user", "content": user_content},
             ],
             "max_tokens": self._max_tokens,
             "temperature": temperature,
