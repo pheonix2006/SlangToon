@@ -27,8 +27,9 @@ class ScriptData(BaseModel):
 
 
 class ScriptRequest(BaseModel):
-    """Script generation request. Currently empty, reserved for future parameters."""
+    """Script generation request."""
     model_config = {"extra": "forbid"}
+    captured_image: str = ""
 
 
 class ScriptResponse(BaseModel):
