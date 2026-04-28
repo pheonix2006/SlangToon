@@ -30,7 +30,7 @@ async def test_stream_success_with_thinking(client, mock_script_data, tmp_data_d
     """成功流式生成：thinking + script + done 事件。"""
     content_json = json.dumps(mock_script_data)
 
-    async def mock_chat_stream(system_prompt, user_text, temperature=0.8):
+    async def mock_chat_stream(system_prompt, user_text, temperature=0.8, image_base64=None):
         yield StreamChunk(type="thinking", text="Let me think...")
         yield StreamChunk(type="thinking", text=" about idioms")
         yield StreamChunk(type="content", text=content_json)
@@ -71,7 +71,7 @@ async def test_stream_no_thinking(client, mock_script_data, tmp_data_dir):
     """模型未产生 thinking 时，只有 script + done。"""
     content_json = json.dumps(mock_script_data)
 
-    async def mock_chat_stream(system_prompt, user_text, temperature=0.8):
+    async def mock_chat_stream(system_prompt, user_text, temperature=0.8, image_base64=None):
         yield StreamChunk(type="content", text=content_json)
         yield StreamChunk(type="done", reasoning="", content=content_json, usage={})
 
@@ -96,7 +96,7 @@ async def test_stream_no_thinking(client, mock_script_data, tmp_data_dir):
 @pytest.mark.asyncio
 async def test_stream_validation_error(client, tmp_data_dir):
     """校验失败时返回 error 事件。"""
-    async def mock_chat_stream(system_prompt, user_text, temperature=0.8):
+    async def mock_chat_stream(system_prompt, user_text, temperature=0.8, image_base64=None):
         yield StreamChunk(type="content", text='{"bad": "data"}')
         yield StreamChunk(type="done", reasoning="", content='{"bad": "data"}', usage={})
 
@@ -123,7 +123,7 @@ async def test_stream_emits_theme_event(client, mock_script_data, tmp_data_dir):
     """SSE 流式响应包含 theme 事件。"""
     content_json = json.dumps(mock_script_data)
 
-    async def mock_chat_stream(system_prompt, user_text, temperature=0.8):
+    async def mock_chat_stream(system_prompt, user_text, temperature=0.8, image_base64=None):
         yield StreamChunk(type="done", reasoning="", content=content_json, usage={})
 
     mock_bl = MagicMock()
@@ -152,7 +152,7 @@ async def test_stream_theme_event_before_thinking(client, mock_script_data, tmp_
     """theme 事件在 thinking 事件之前发出。"""
     content_json = json.dumps(mock_script_data)
 
-    async def mock_chat_stream(system_prompt, user_text, temperature=0.8):
+    async def mock_chat_stream(system_prompt, user_text, temperature=0.8, image_base64=None):
         yield StreamChunk(type="thinking", text="Thinking...")
         yield StreamChunk(type="done", reasoning="Thinking...", content=content_json, usage={})
 
@@ -173,3 +173,58 @@ async def test_stream_theme_event_before_thinking(client, mock_script_data, tmp_
     theme_idx = event_types.index("theme")
     thinking_idx = event_types.index("thinking")
     assert theme_idx < thinking_idx
+
+
+@pytest.mark.asyncio
+async def test_stream_passes_image_to_llm(client, mock_script_data, tmp_data_dir):
+    """captured_image is forwarded to chat_stream as image_base64."""
+    content_json = json.dumps(mock_script_data)
+    received_kwargs = {}
+
+    async def mock_chat_stream(system_prompt, user_text, temperature=0.8, image_base64=None):
+        received_kwargs["image_base64"] = image_base64
+        yield StreamChunk(type="done", reasoning="", content=content_json, usage={})
+
+    mock_bl = MagicMock()
+    mock_bl.get_recent.return_value = []
+
+    with patch("app.routers.script_stream.build_script_context") as mock_ctx, \
+         patch("app.routers.script_stream.LLMClient") as MockLLM, \
+         patch("app.routers.script_stream.validate_and_finalize") as mock_validate:
+        mock_ctx.return_value = ("prompt", mock_bl)
+        MockLLM.return_value.chat_stream = mock_chat_stream
+        mock_validate.return_value = mock_script_data
+
+        resp = await client.post(
+            "/api/generate-script-stream",
+            json={"captured_image": "data:image/jpeg;base64,test123"},
+        )
+
+    assert resp.status_code == 200
+    assert received_kwargs["image_base64"] == "data:image/jpeg;base64,test123"
+
+
+@pytest.mark.asyncio
+async def test_stream_no_image_passes_none(client, mock_script_data, tmp_data_dir):
+    """When no captured_image, image_base64 should be None."""
+    content_json = json.dumps(mock_script_data)
+    received_kwargs = {}
+
+    async def mock_chat_stream(system_prompt, user_text, temperature=0.8, image_base64=None):
+        received_kwargs["image_base64"] = image_base64
+        yield StreamChunk(type="done", reasoning="", content=content_json, usage={})
+
+    mock_bl = MagicMock()
+    mock_bl.get_recent.return_value = []
+
+    with patch("app.routers.script_stream.build_script_context") as mock_ctx, \
+         patch("app.routers.script_stream.LLMClient") as MockLLM, \
+         patch("app.routers.script_stream.validate_and_finalize") as mock_validate:
+        mock_ctx.return_value = ("prompt", mock_bl)
+        MockLLM.return_value.chat_stream = mock_chat_stream
+        mock_validate.return_value = mock_script_data
+
+        resp = await client.post("/api/generate-script-stream", json={})
+
+    assert resp.status_code == 200
+    assert received_kwargs["image_base64"] in (None, "")

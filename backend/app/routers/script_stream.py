@@ -54,10 +54,13 @@ async def generate_script_stream_endpoint(
             })
             llm = LLMClient(settings)
 
+            image_base64 = request.captured_image or None
+
             async for chunk in llm.chat_stream(
                 system_prompt=system_prompt,
                 user_text=_USER_TEXT,
                 temperature=0.9,
+                image_base64=image_base64,
             ):
                 if chunk.type == "thinking":
                     yield _sse_event("thinking", {"text": chunk.text})
