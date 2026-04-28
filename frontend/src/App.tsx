@@ -99,6 +99,7 @@ function App() {
           throw new Error(msg);
         },
         (theme) => setThemeName(theme.theme_name_zh),
+        capturedImage,
       );
 
       if (!scriptResult) {

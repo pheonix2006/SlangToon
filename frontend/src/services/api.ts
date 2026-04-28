@@ -184,12 +184,13 @@ export async function generateScriptStream(
   onScript: (data: ScriptData) => void,
   onError: (msg: string) => void,
   onTheme?: (theme: { theme_id: string; theme_name_zh: string }) => void,
+  capturedImage?: string,
 ): Promise<void> {
   const url = `${API_BASE_URL}${API_ENDPOINTS.GENERATE_SCRIPT_STREAM}`;
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ captured_image: capturedImage ?? "" }),
     signal: AbortSignal.timeout(dynamicTimeouts.script),
   });
 
