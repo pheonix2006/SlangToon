@@ -264,10 +264,10 @@ function App() {
                     label={generatingPhase === 'thinking' ? 'THINKING' : 'CREATING'}
                     subtext={
                       generatingPhase === 'thinking'
-                        ? 'AI 正在构思剧本...'
+                        ? 'AI 正在构思剧本 / AI is crafting your story...'
                         : themeName
-                          ? `正在以 ${themeName} 风格创作...`
-                          : '正在生成漫画...'
+                          ? `正在以 ${themeName} 风格创作 / Painting in ${themeName} style...`
+                          : '正在生成漫画 / Bringing your comic to life...'
                     }
                   />
                   <ThinkingDisplay
